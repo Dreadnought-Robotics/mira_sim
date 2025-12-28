@@ -54,7 +54,7 @@ def generate_launch_description():
                         [FindPackageShare("common_resources"), "data"]
                     ),
                     "scenario_desc": PathJoinSubstitution(
-                        [FindPackageShare("dnt_simulator"), "scenarios", "TACC.scn"]
+                        [FindPackageShare("dnt_simulator"), "scenarios", "TACC_DOCKING.scn"]
                     ),
                     "simulation_rate": "300.0",
                     # "parameter_file": "tacc_config.yaml",

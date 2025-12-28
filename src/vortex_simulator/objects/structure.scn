@@ -12,8 +12,8 @@
     <material name="Neutral"/>
     <look name="Yellow"/>
     <world_transform
-      xyz="$(param structure_position)"
-      rpy="$(param structure_orientation)"/>
+      xyz="1.0 -18.0 8.1"
+      rpy="-1.57 0.0 -1.57"/>
   </static>
 
   <robot name="valve1" fixed="true" self_collisions="false">
@@ -64,8 +64,8 @@
     </joint>
 
     <world_transform
-      xyz="$(param structure_position)"
-      rpy="$(param structure_orientation)"/>
+      xyz="1.0 -18.0 8.1"
+      rpy="-1.57 0.0 -1.57"/>
   </robot>
 
   <robot name="valve2" fixed="true" self_collisions="false">
@@ -116,8 +116,8 @@
     </joint>
 
     <world_transform
-      xyz="$(param structure_position)"
-      rpy="$(param structure_orientation)"/>
+      xyz="1.0 -18.0 8.1"
+      rpy="-1.57 0.0 -1.57"/>
   </robot>
 
   <robot name="structure_markers" fixed="true" self_collisions="false">
@@ -155,7 +155,7 @@
     </joint>
 
     <world_transform
-      xyz="$(param structure_position)"
-      rpy="$(param structure_orientation)"/>
+      xyz="1.0 -18.0 8.1"
+      rpy="-1.57 0.0 -1.57"/>
   </robot>
 </scenario>

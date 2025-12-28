@@ -1,6 +1,8 @@
 services:
   ardupilot-sitl:
-    image: ardupilot-sitl
+    build:
+      context: .
+      dockerfile: Dockerfile
     platform: linux/amd64
     tty: true
     environment:
@@ -22,3 +24,18 @@ services:
     command: >
       -c "
       cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py --no-mavproxy -N -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1"
+  mira_sim:
+    build:
+      context: .
+      dockerfile: stonefish.Dockerfile
+    platform: linux/amd64
+    tty: true
+    network_mode: host
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/root/.Xauthority
+      - QT_X11_NO_MITSHM=1
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - $HOME/.Xauthority:/root/.Xauthority:rw
+    entrypoint: /bin/bash

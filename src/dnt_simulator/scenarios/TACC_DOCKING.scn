@@ -3,7 +3,7 @@
   <environment>
     <ned latitude="63.446827" longitude="10.421906"/>
     <ocean>
-        <water density="1031.0" jerlov="$(param water_jerlow)"/>
+        <water density="1031.0" jerlov="0.20"/>
         <waves height="0.0"/>
         <particles enabled="true"/>
         <current type="uniform">
@@ -28,13 +28,19 @@
     </atmosphere>
   </environment>
 
-  <include file="$(find stonefish_sim)/metadata/materials.scn"/>
-  <include file="$(find stonefish_sim)/metadata/looks.scn"/>
+  <include file="$(find vortex_simulator)/metadata/materials.scn"/>
+  <include file="$(find vortex_simulator)/metadata/looks.scn"/>
 
-  <!-- <include file="$(find stonefish_sim)/drones/$(param drone_file)"/> -->
 
-  <include file="$(find stonefish_sim)/objects/dock.scn"/>
-  <include file="$(find stonefish_sim)/objects/pool.scn"/>
-  <include file="$(find stonefish_sim)/drones/gripper.scn"/>
+     <include file="$(find dnt_simulator)/scenarios/bluerov2.scn">
+		<arg name="vehicle_name" value="bluerov2"/>
+		<arg name="position" value="0.0 7.5 0.5"/>
+		<arg name="orientation" value="-1.57 0.0 0.0"/>
+	</include>
+  <!-- <include file="$(find vortex_simulator)/drones/$(param drone_file)"/> -->
+
+  <include file="$(find vortex_simulator)/objects/dock.scn"/>
+  <include file="$(find vortex_simulator)/objects/pool.scn"/>
+  <include file="$(find vortex_simulator)/drones/gripper.scn"/>
 
 </scenario>

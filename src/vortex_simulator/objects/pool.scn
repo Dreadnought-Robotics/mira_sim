@@ -12,7 +12,7 @@
     </visual>
     <material name="Steel"/>
     <look name="White"/>
-    <world_transform xyz="$(param pool_position)" rpy="$(param pool_orientation)"/>
+    <world_transform xyz="0.0 3.0 -0.2" rpy="-1.57 0.0 0.0"/>
   </static>
 
 </scenario>

@@ -67,7 +67,7 @@
       <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0"/>
     </joint>
 
-    <world_transform xyz="$(param docking_station_position)" rpy="$(param docking_station_orientation)"/>
+    <world_transform xyz="0.0 7.5 4.0" rpy="1.57 0.0 1.57"/>
   </robot>
 
 </scenario>

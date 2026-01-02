@@ -1,8 +1,9 @@
 services:
   ardupilot-sitl:
+    # image: ardupilot-sitl
     build:
-      context: .
-      dockerfile: Dockerfile
+     context: .
+     dockerfile: Dockerfile
     platform: linux/amd64
     tty: true
     environment:
@@ -23,7 +24,7 @@ services:
     entrypoint: /bin/bash
     command: >
       -c "
-      cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py --no-mavproxy -N -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1"
+      cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py  -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1"
   mira_sim:
     build:
       context: .

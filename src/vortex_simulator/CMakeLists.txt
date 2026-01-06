@@ -9,10 +9,10 @@ find_package(ament_cmake REQUIRED)
 find_package(stonefish_ros2 REQUIRED)
 
 install(DIRECTORY
-  config
+  # config
   launch
   scenarios
-  data
+  # data
   metadata
   drones
   objects

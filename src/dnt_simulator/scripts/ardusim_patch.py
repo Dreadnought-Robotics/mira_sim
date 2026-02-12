@@ -2,10 +2,12 @@
 import rclpy
 from rclpy.node import Node
 
+from scipy.spatial.transform import Rotation as R
+
 import socket
 import struct
 import json
-import time 
+import time
 
 from std_msgs.msg import Float64MultiArray
 from sensor_msgs.msg import NavSatFix
@@ -15,6 +17,7 @@ from nav_msgs.msg import Odometry
 from tf_transformations import quaternion_from_euler, euler_from_quaternion
 
 import numpy as np
+
 
 class Patch(Node):
     def __init__(self, node_name, namespace):
@@ -31,17 +34,17 @@ class Patch(Node):
         self.pub_pwm = self.create_publisher(Float64MultiArray, "thrusters", 1)
 
         # Publish everything
-        self.timer = self.create_timer(1/50, self.looper)
+        self.timer = self.create_timer(1 / 50, self.looper)
 
         # if self.namespace=='bluerov2':
-            # PORT = 9012
+        # PORT = 9012
         # elif self.namespace=='blueboat':
         # PORT = 5001
         PORT = 9002
         print("Binding to port:", PORT)
 
         self.sock_sitl = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.sock_sitl.bind(('', PORT))
+        self.sock_sitl.bind(("", PORT))
         self.sock_sitl.settimeout(1)
 
         self.imu = None
@@ -62,41 +65,49 @@ class Patch(Node):
 
     def looper(self):
         if self.imu is None or self.odom is None:
-            self.get_logger().info(f"Wating for callbacks Imu={self.imu is None}, Odom={self.odom is None}", once=False)
-            time.sleep(.5)
+            self.get_logger().info(
+                f"Wating for callbacks Imu={self.imu is None}, Odom={self.odom is None}",
+                once=False,
+            )
+            time.sleep(0.5)
             return
-        
+
         self.get_logger().info("Callbacks received", once=True)
-        
+
         try:
             data, address = self.sock_sitl.recvfrom(100)
         except Exception as ex:
-            self.get_logger().info("Socket receive failed, is SITL running?", once=False)
+            self.get_logger().info(
+                "Socket receive failed, is SITL running?", once=False
+            )
             print(ex)
             time.sleep(1)
-            return 
-    
-        parse_format = 'HHI16H'
+            return
+
+        parse_format = "HHI16H"
         magic = 18458
 
         if len(data) != struct.calcsize(parse_format):
-            print("got packet of len %u, expected %u" % (len(data), struct.calcsize(parse_format)))
-            return 
-        
-        decoded = struct.unpack(parse_format,data)
+            print(
+                "got packet of len %u, expected %u"
+                % (len(data), struct.calcsize(parse_format))
+            )
+            return
+
+        decoded = struct.unpack(parse_format, data)
 
         if magic != decoded[0]:
             print("Incorrect protocol magic %u should be %u" % (decoded[0], magic))
-            return 
+            return
 
         frame_rate_hz = decoded[1]
         frame_count = decoded[2]
         pwm = decoded[3:]
 
-        if self.namespace=='bluerov2':
+        if self.namespace == "bluerov2":
             pwm_thrusters = pwm[0:8]
-            pwm_setpoint = [(x-1500)/400 for x in pwm_thrusters]
-      
+            pwm_setpoint = [(x - 1500) / 400 for x in pwm_thrusters]
+
         # print(pwm_setpoint)
 
         # print([pwm[2], pwm[0]])
@@ -109,25 +120,35 @@ class Patch(Node):
         self.pub_pwm.publish(msg_pwm)
 
         # Set mesasges
-        accel = (self.imu.linear_acceleration.x, self.imu.linear_acceleration.y, self.imu.linear_acceleration.z)
-        gyro = (self.imu.angular_velocity.x, self.imu.angular_velocity.y, -self.imu.angular_velocity.z)
-        
+        accel = (
+            self.imu.linear_acceleration.x,
+            self.imu.linear_acceleration.y,
+            -self.imu.linear_acceleration.z,
+        )
+        gyro = (
+            self.imu.angular_velocity.x,
+            self.imu.angular_velocity.y,
+            -self.imu.angular_velocity.z,
+        )
+
         pose_position = (
             self.odom.pose.pose.position.x,
             self.odom.pose.pose.position.y,
-            self.odom.pose.pose.position.z
+            -self.odom.pose.pose.position.z,
         )
 
-        pose_attitude = euler_from_quaternion([
-            self.odom.pose.pose.orientation.x,
-            self.odom.pose.pose.orientation.y,
-            self.odom.pose.pose.orientation.z,
-            self.odom.pose.pose.orientation.w
-        ])
-        
-        pose_attitude = [pose_attitude[0], pose_attitude[1], pose_attitude[2]]
+        # pose_attitude = euler_from_quaternion(
+        #     [
+        #         self.odom.pose.pose.orientation.x,
+        #         self.odom.pose.pose.orientation.y,
+        #         self.odom.pose.pose.orientation.z,
+        #         self.odom.pose.pose.orientation.w,
+        #     ]
+        # )
+
+        # pose_attitude = [pose_attitude[0], pose_attitude[1], pose_attitude[2]]
         # print("Yaw:", np.rad2deg(pose_attitude[2]))
-        
+
         twist_linear = (
             self.odom.twist.twist.linear.x,
             self.odom.twist.twist.linear.y,
@@ -136,26 +157,36 @@ class Patch(Node):
             self.odom.twist.twist.angular.y,
             -self.odom.twist.twist.angular.z,
         )
-        
+
+        q_flipped = (R.from_euler('x', 180, degrees=True) * R.from_quat([
+            self.odom.pose.pose.orientation.x,
+            self.odom.pose.pose.orientation.y,
+            self.odom.pose.pose.orientation.z,
+            self.odom.pose.pose.orientation.w,
+        ])).as_quat()
+
         c_time = self.get_clock().now().to_msg()
-        c_time = c_time.sec + c_time.nanosec/1e9
+        c_time = c_time.sec + c_time.nanosec / 1e9
 
         # build JSON format
-        IMU_fmt = {
-            "gyro" : gyro,
-            "accel_body" : accel
-        }
+        IMU_fmt = {"gyro": gyro, "accel_body": accel}
         JSON_fmt = {
-            "timestamp" : c_time,
-            "imu" : IMU_fmt,
-            "position" : pose_position,
-            "attitude" : pose_attitude,
-            "velocity" : twist_linear,                          
+            "timestamp": c_time,
+            "imu": IMU_fmt,
+            "quaternion": [
+                q_flipped[0],
+                q_flipped[1],
+                q_flipped[2],
+                q_flipped[3],
+            ],
+            "position": pose_position,
+            # "attitude": pose_attitude,
+            "velocity": twist_linear,
         }
-        JSON_string = "\n" + json.dumps(JSON_fmt,separators=(',', ':')) + "\n"
+        JSON_string = "\n" + json.dumps(JSON_fmt, separators=(",", ":")) + "\n"
 
         # Send to AP
-        self.sock_sitl.sendto(bytes(JSON_string,"ascii"), address)
+        self.sock_sitl.sendto(bytes(JSON_string, "ascii"), address)
 
         # print(self.gps.latitude)
 
@@ -183,12 +214,13 @@ class Patch(Node):
         # gps_data = json.dumps(gps_data)
         # self.gps_sock.sendto(gps_data.encode(), ("127.0.0.1", 25100))
 
+
 def main(args=None):
     rclpy.init(args=args)
 
     # patch = Patch(node_name="ardusim_patch")
-    patch = Patch(node_name="ardusim_patch", namespace='blueboat')
-    
+    patch = Patch(node_name="ardusim_patch", namespace="blueboat")
+
     rclpy.spin(patch)
 
     # Destroy the node explicitly, otherwise it will be done automatically

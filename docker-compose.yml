@@ -10,21 +10,13 @@ services:
       - VEHICLE=ArduSub
       - MODEL=vectored
       - PATH=/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-    ports:
-      - 5760:5760/tcp
-      - 14550:14550/udp
-      - 5501:5501
-      - 9002:9002
-      - 9001:9001
-      - 5502:5502
-      - 5503:5503
     volumes:
       - ./ardupilot:/ardupilot_data
     network_mode: host
     entrypoint: /bin/bash
     command: >
       -c "
-      cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py  -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1"
+      cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py -N -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1"
   mira_sim:
     build:
       context: .

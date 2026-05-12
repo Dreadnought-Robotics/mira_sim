@@ -1,0 +1,69 @@
+name: ubuntu-build
+
+on: [push, pull_request, workflow_dispatch]
+# paths:
+# - "*"
+# - "!README.md" <-- don't rebuild on doc change
+concurrency:
+  group: ci-${{github.workflow}}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    name: ubuntu-build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      - name: Setup Gazebo
+        uses: gazebo-tooling/setup-gazebo@v0.3.0
+        with:
+          required-gazebo-distributions: harmonic
+
+      - name: Install Build Dependencies
+        shell: bash
+        run: |
+          sudo apt update && sudo apt install --no-install-recommends -y \
+          software-properties-common \
+          make \
+          cmake \
+          ccache \
+          g++ \
+          git
+          sudo apt update && sudo apt install --no-install-recommends -y \
+          rapidjson-dev \
+          libopencv-dev \
+          libunwind-dev \
+          libgstreamer1.0-dev \
+          libgstreamer-plugins-base1.0-dev \
+          gstreamer1.0-plugins-bad \
+          gstreamer1.0-libav \
+          gstreamer1.0-gl
+
+      # Put ccache into github cache for faster build
+      - name: Prepare ccache timestamp
+        id: ccache_cache_timestamp
+        run: |
+          NOW=$(date -u +"%F-%T")
+          echo "::set-output name=timestamp::${NOW}"
+
+      - name: Cache ccache files
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{github.workflow}}-ccache-${{steps.ccache_cache_timestamp.outputs.timestamp}}
+          restore-keys: ${{github.workflow}}-ccache-  # restore ccache from either previous build on this branch or on master
+
+      - name: Setup ccache
+        run: |
+          . .github/workflows/ccache.env
+
+      - name: Build
+        shell: bash
+        run: |
+          mkdir build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          make -j4

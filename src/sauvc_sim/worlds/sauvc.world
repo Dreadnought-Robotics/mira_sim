@@ -1,0 +1,103 @@
+<sdf version='1.7'>
+  <world name='default'>
+
+    <gui fullscreen='0'>
+      <camera name='user_camera'>
+        <pose>8.89582 -13.5053 3.48143 0 0.308 1.808</pose>
+      </camera>
+    </gui>
+
+    <include>
+      <uri>model://sun</uri>
+    </include>
+
+    <include>
+      <uri>model://orca</uri>
+      <pose>7 -10 1.5 0 0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://wall</uri>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://gate</uri>
+      <pose>7 0 0 0 -0 0</pose>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://orange_flare</uri>
+      <pose>7 -3 0 0 -0 0</pose>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://green_mat</uri>
+      <pose>10 10 0 0 -0 0</pose>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://blue_drum</uri>
+      <pose>7 10 -0 0 -0 0</pose>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://red_drum</uri>
+      <name>red_drum0</name>
+      <pose>9 10 -0 0 -0 0</pose>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://red_drum</uri>
+      <name>red_drum1</name>
+      <pose>11 10 -0 0 -0 0</pose>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://red_drum</uri>
+      <name>red_drum2</name>
+      <pose>13 10 -0 0 -0 0</pose>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://pool_ground</uri>
+      <pose>0 0 -0 0 -0 0</pose>
+      <static>1</static>
+    </include>
+
+    <include>
+      <uri>model://golf_ball</uri>
+      <pose>7 10 0.2 0 -0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://yellow_flare</uri>
+      <pose>20 5 0.2 0 -0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://blue_flare</uri>
+      <pose>19.8 4 0.2 0 -0 0</pose>
+    </include>
+
+    <include>
+      <uri>model://red_flare</uri>
+      <pose>19.6 3 0.2 0 -0 0</pose>
+    </include>
+
+    <plugin name="gazebo_ros_state" filename="libgazebo_ros_state.so">
+      <ros>
+        <namespace>/sauvc_sim</namespace>
+      </ros>
+      <update_rate>30.0</update_rate>
+    </plugin>
+
+  </world>
+</sdf>

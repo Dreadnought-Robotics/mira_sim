@@ -1,0 +1,144 @@
+<?xml version='1.0'?>
+<sdf version='1.7'>
+  <model name='camera'>
+    <link name='link'>
+      <inertial>
+        <mass>0.00000001</mass>
+        <inertia>
+          <ixx>1.02e-06</ixx>
+          <iyy>4.6e-07</iyy>
+          <izz>9.2e-07</izz>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyz>0</iyz>
+        </inertia>
+        <pose>0 0 0 0 -0 0</pose>
+      </inertial>
+      <sensor name='camera' type='camera'>
+        <!-- Set always_on only sensor, not on plugin -->
+        <always_on>0</always_on>
+
+        <!-- Set update_rate only sensor, not on plugin -->
+        <update_rate>1</update_rate>
+
+        <camera name="camera_name">
+          <distortion>
+            <k1>0.0</k1>
+            <k2>0.0</k2>
+            <k3>0.0</k3>
+            <p1>0.0</p1>
+            <p2>0.0</p2>
+            <!-- <center>0.5 0.5</center> -->
+          </distortion>
+        </camera>
+
+        <!-- Use camera, not camera_triggered -->
+        <plugin name="plugin_name" filename="libgazebo_ros_camera.so">
+          <!-- Change namespace, camera name and topics so -
+                * Images are published to: /custom_ns/custom_camera/custom_image
+                * Camera info is published to: /custom_ns/custom_camera/custom_info
+          -->
+          <ros>
+            <namespace>custom_ns</namespace>
+            <remapping>image_raw:=custom_img</remapping>
+            <remapping>camera_info:=custom_info</remapping>
+          </ros>
+
+          <!-- Set camera name. If empty, defaults to sensor name (i.e. "sensor_name") -->
+          <camera_name>custom_camera</camera_name>
+
+          <!-- Set TF frame name. If empty, defaults to link name (i.e. "link_name") -->
+          <frame_name>custom_frame</frame_name>
+
+          <hack_baseline>0.07</hack_baseline>
+
+          <!-- No need to repeat distortion parameters or to set autoDistortion -->
+        </plugin> 
+      </sensor>
+      <self_collide>0</self_collide>
+      <enable_wind>0</enable_wind>
+      <kinematic>0</kinematic>
+      <pose>0 0 0 0 -0 1.5708</pose>
+      <gravity>1</gravity>
+      <visual name='visual'>
+        <geometry>
+          <box>
+            <size>0.024333 0.049378 0.030361</size>
+          </box>
+        </geometry>
+        <material>
+          <shader type='pixel'>
+            <normal_map>__default__</normal_map>
+          </shader>
+          <script>
+            <name>ModelPreview_4::link::visual_MATERIAL_</name>
+          </script>
+          <ambient>1 0 0 1</ambient>
+          <diffuse>1 0 0 1</diffuse>
+          <specular>0 0 0 1</specular>
+          <emissive>0 0 0 1</emissive>
+        </material>
+        <pose>0 0 0 0 -0 0</pose>
+        <transparency>0</transparency>
+        <cast_shadows>1</cast_shadows>
+      </visual>
+      <collision name='collision'>
+        <laser_retro>0</laser_retro>
+        <max_contacts>10</max_contacts>
+        <pose>0 0 0 0 -0 0</pose>
+        <geometry>
+          <box>
+            <size>0.024333 0.049378 0.030361</size>
+          </box>
+        </geometry>
+        <surface>
+          <friction>
+            <ode>
+              <mu>1</mu>
+              <mu2>1</mu2>
+              <fdir1>0 0 0</fdir1>
+              <slip1>0</slip1>
+              <slip2>0</slip2>
+            </ode>
+            <torsional>
+              <coefficient>1</coefficient>
+              <patch_radius>0</patch_radius>
+              <surface_radius>0</surface_radius>
+              <use_patch_radius>1</use_patch_radius>
+              <ode>
+                <slip>0</slip>
+              </ode>
+            </torsional>
+          </friction>
+          <bounce>
+            <restitution_coefficient>0</restitution_coefficient>
+            <threshold>1e+06</threshold>
+          </bounce>
+          <contact>
+            <collide_without_contact>0</collide_without_contact>
+            <collide_without_contact_bitmask>1</collide_without_contact_bitmask>
+            <collide_bitmask>1</collide_bitmask>
+            <ode>
+              <soft_cfm>0</soft_cfm>
+              <soft_erp>0.2</soft_erp>
+              <kp>1e+13</kp>
+              <kd>1</kd>
+              <max_vel>0.01</max_vel>
+              <min_depth>0</min_depth>
+            </ode>
+            <bullet>
+              <split_impulse>1</split_impulse>
+              <split_impulse_penetration_threshold>-0.01</split_impulse_penetration_threshold>
+              <soft_cfm>0</soft_cfm>
+              <soft_erp>0.2</soft_erp>
+              <kp>1e+13</kp>
+              <kd>1</kd>
+            </bullet>
+          </contact>
+        </surface>
+      </collision>
+    </link>
+    <static>1</static>
+    <allow_auto_disable>1</allow_auto_disable>
+  </model>
+</sdf>

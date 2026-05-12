@@ -1,0 +1,5 @@
+prepend-non-duplicate;GAZEBO_MODEL_PATH;share/@PROJECT_NAME@/models
+prepend-non-duplicate;GAZEBO_RESOURCE_PATH;share/@PROJECT_NAME@/worlds
+prepend-non-duplicate;GAZEBO_RESOURCE_PATH;share/@PROJECT_NAME@/meshes
+prepend-non-duplicate;GZ_SIM_RESOURCE_PATH;share/@PROJECT_NAME@/models
+prepend-non-duplicate;GZ_SIM_RESOURCE_PATH;share/@PROJECT_NAME@/worlds

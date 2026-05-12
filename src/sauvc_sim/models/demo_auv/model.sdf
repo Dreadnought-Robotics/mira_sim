@@ -1,0 +1,658 @@
+<?xml version="1.0"?>
+<sdf version="1.8">
+  <model name="demo_auv">
+
+    <link name="main_body">
+
+      <inertial>
+        <mass>20</mass>
+        <inertia>
+          <ixx>0.2</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.5</iyy>
+          <iyz>0</iyz>
+          <izz>0.5</izz>
+        </inertia>
+      </inertial>
+
+      <collision name="main_body_buoyancy">
+        <pose>0 0 0.115 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.6 0.200 0.200</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <visual name="main_hull_visual">
+        <pose>0 0 0.115 0 1.5707963268 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>0.115</radius>
+            <length>0.6</length>
+          </cylinder>
+        </geometry>
+        <transparency>0.5</transparency>  <!-- High transparency for see-through effect -->
+        <cast_shadows>0</cast_shadows>  <!-- No shadows from transparent material -->
+        <material>
+          <ambient>0.1 0.15 0.2 1</ambient>  <!-- Subtle ambient tint -->
+          <diffuse>0.8 0.95 1.0 1</diffuse>  <!-- Clear cyan tint for acrylic -->
+          <specular>0.8 0.8 0.8 1</specular>  <!-- Glossy reflection -->
+          <emissive>0 0 0 0</emissive>  <!-- No self-glow -->
+        </material>
+      </visual>
+
+      <visual name="main_frame_visual">
+        <pose>0 0 -0.070 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.6 0.340 0.140</size>
+          </box>
+        </geometry>
+        
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+      <!-- Intel RealSense-style depth camera at front -->
+      <sensor name="realsense_camera" type="rgbd_camera">
+        <pose>1.0 0 0 0 0 0</pose>
+        <camera>
+        <horizontal_fov>1.204</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <depth_camera>
+          <output>depths</output>
+        </depth_camera>
+        <clip>
+          <near>0.1</near>
+          <far>10.0</far>
+        </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <topic>realsense</topic>
+      </sensor>
+
+      <!-- Bottom-side camera sensor -->
+      <sensor name="bottom_cam" type="camera">
+        <pose>0 0 -0.123 0 1.57 0</pose>
+        <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>100</far>
+        </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <topic>bottom_cam</topic>
+      </sensor>       
+        
+      <!-- Side-looking camera -->
+      <sensor name="side_cam" type="camera">
+        <pose>0 0.15 0 0 0 1.57</pose>
+        <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>100</far>
+        </clip>
+        </camera>
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <topic>side_cam</topic>
+      </sensor>
+
+    </link>
+
+    <plugin
+      filename="ignition-gazebo-hydrodynamics-system"
+      name="ignition::gazebo::systems::Hydrodynamics">
+      <link_name>main_body</link_name>
+
+      <xDotU>-1</xDotU>
+      <yDotV>-1</yDotV>
+      <zDotW>-1</zDotW>
+
+      <kDotP>-0.1</kDotP>
+      <mDotQ>-0.1</mDotQ>
+      <nDotR>-0.1</nDotR>
+
+      <xUabsU>-1</xUabsU>
+      <yVabsV>-1</yVabsV>
+      <zWabsW>-1</zWabsW>
+
+      <kPabsP>-1</kPabsP>
+      <mQabsQ>-1</mQabsQ>
+      <nRabsR>-1</nRabsR>
+
+      <xU>-30</xU>
+      <yV>-30</yV>
+      <zW>-30</zW>
+
+      <kP>-1</kP>
+      <mQ>-1</mQ>
+      <nR>-1</nR>
+    </plugin>
+
+
+    <plugin filename="libignition-gazebo-velocity-control-system.so"
+      name="ignition::gazebo::systems::VelocityControl">
+      <link_name>main_body</link_name>
+      <topic>/cmd_vel</topic>
+      <initial_linear>0.0 0.0 0.0</initial_linear>
+      <initial_angular>0.0 0.0 0.0</initial_angular>
+    </plugin>
+
+
+    <!-- thruster_0 begin -->
+
+    <link name="thruster_0">
+
+      <pose relative_to="main_body">0.150 0.237 0 0 1.5707963268 0</pose>
+
+      <inertial>
+        <mass>0.427</mass>
+        <inertia>
+          <ixx>0.0006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0003</iyy>
+          <iyz>0</iyz>
+          <izz>0.0003</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="thruster_0_visual">
+        <pose>0 0 0 0 1.5707963268 0</pose>
+
+        <geometry>
+          <cylinder>
+            <radius>0.050</radius>
+            <length>0.113</length>
+          </cylinder>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+    </link>
+
+    <joint name="thruster_0_joint" type="revolute">
+      <parent>main_body</parent>
+      <child>thruster_0</child>
+
+      <axis>
+        <xyz>1 0 0</xyz>
+      </axis>
+    </joint>
+
+    <!-- <plugin
+      filename="ignition-gazebo-thruster-system"
+      name="ignition::gazebo::systems::Thruster">
+      <namespace>orca_auv</namespace>
+      <topic>thruster_0/set_output_force_N</topic>
+
+      <joint_name>thruster_0_joint</joint_name>
+
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.076</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+    </plugin> -->
+
+    <!-- thruster_0 end -->
+
+    <!-- thruster_1 begin -->
+
+    <link name="thruster_1">
+
+      <pose relative_to="main_body">0.150 -0.237 0 0 1.5707963268 0</pose>
+
+      <inertial>
+        <mass>0.427</mass>
+        <inertia>
+          <ixx>0.0006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0003</iyy>
+          <iyz>0</iyz>
+          <izz>0.0003</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="thruster_1_visual">
+        <pose>0 0 0 0 1.5707963268 0</pose>
+
+        <geometry>
+          <cylinder>
+            <radius>0.050</radius>
+            <length>0.113</length>
+          </cylinder>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+    </link>
+
+    <joint name="thruster_1_joint" type="revolute">
+      <parent>main_body</parent>
+      <child>thruster_1</child>
+
+      <axis>
+        <xyz>1 0 0</xyz>
+      </axis>
+    </joint>
+
+    <!-- <plugin
+      filename="ignition-gazebo-thruster-system"
+      name="ignition::gazebo::systems::Thruster">
+      <namespace>orca_auv</namespace>
+      <topic>thruster_1/set_output_force_N</topic>
+
+      <joint_name>thruster_1_joint</joint_name>
+
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.076</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+    </plugin> -->
+
+    <!-- thruster_1 end -->
+
+    <!-- thruster_2 begin -->
+
+    <link name="thruster_2">
+
+      <pose relative_to="main_body">-0.150 0.237 0 0 1.5707963268 0</pose>
+
+      <inertial>
+        <mass>0.427</mass>
+        <inertia>
+          <ixx>0.0006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0003</iyy>
+          <iyz>0</iyz>
+          <izz>0.0003</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="thruster_2_visual">
+        <pose>0 0 0 0 1.5707963268 0</pose>
+
+        <geometry>
+          <cylinder>
+            <radius>0.050</radius>
+            <length>0.113</length>
+          </cylinder>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+    </link>
+
+    <joint name="thruster_2_joint" type="revolute">
+      <parent>main_body</parent>
+      <child>thruster_2</child>
+
+      <axis>
+        <xyz>1 0 0</xyz>
+      </axis>
+    </joint>
+
+    <!-- <plugin
+      filename="ignition-gazebo-thruster-system"
+      name="ignition::gazebo::systems::Thruster">
+      <namespace>orca_auv</namespace>
+      <topic>thruster_2/set_output_force_N</topic>
+
+      <joint_name>thruster_2_joint</joint_name>
+
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.076</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+    </plugin> -->
+
+    <!-- thruster_2 end -->
+
+    <!-- thruster_3 begin -->
+
+    <link name="thruster_3">
+
+      <pose relative_to="main_body">-0.150 -0.237 0 0 1.5707963268 0</pose>
+
+      <inertial>
+        <mass>0.427</mass>
+        <inertia>
+          <ixx>0.0006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0003</iyy>
+          <iyz>0</iyz>
+          <izz>0.0003</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="thruster_3_visual">
+        <pose>0 0 0 0 1.5707963268 0</pose>
+
+        <geometry>
+          <cylinder>
+            <radius>0.050</radius>
+            <length>0.113</length>
+          </cylinder>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+    </link>
+
+    <joint name="thruster_3_joint" type="revolute">
+      <parent>main_body</parent>
+      <child>thruster_3</child>
+
+      <axis>
+        <xyz>1 0 0</xyz>
+      </axis>
+    </joint>
+
+    <!-- <plugin
+      filename="ignition-gazebo-thruster-system"
+      name="ignition::gazebo::systems::Thruster">
+      <namespace>orca_auv</namespace>
+      <topic>thruster_3/set_output_force_N</topic>
+
+      <joint_name>thruster_3_joint</joint_name>
+
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.076</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+    </plugin> -->
+
+    <!-- thruster_3 end -->
+
+    <!-- thruster_4 begin -->
+
+    <link name="thruster_4">
+
+      <pose relative_to="main_body">0.29651 0.213 0 0 0 -0.7853981634</pose>
+
+      <inertial>
+        <mass>0.427</mass>
+        <inertia>
+          <ixx>0.0006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0003</iyy>
+          <iyz>0</iyz>
+          <izz>0.0003</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="thruster_4_visual">
+        <pose>0 0 0 0 1.5707963268 0</pose>
+
+        <geometry>
+          <cylinder>
+            <radius>0.050</radius>
+            <length>0.113</length>
+          </cylinder>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+    </link>
+
+    <joint name="thruster_4_joint" type="revolute">
+      <parent>main_body</parent>
+      <child>thruster_4</child>
+
+      <axis>
+        <xyz>1 0 0</xyz>
+      </axis>
+    </joint>
+
+    <!-- <plugin
+      filename="ignition-gazebo-thruster-system"
+      name="ignition::gazebo::systems::Thruster">
+      <namespace>orca_auv</namespace>
+      <topic>thruster_4/set_output_force_N</topic>
+
+      <joint_name>thruster_4_joint</joint_name>
+
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.076</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+    </plugin> -->
+
+    <!-- thruster_4 end -->
+
+    <!-- thruster_5 begin -->
+
+    <link name="thruster_5">
+
+      <pose relative_to="main_body">0.29651 -0.213 0 0 0 0.7853981634</pose>
+
+      <inertial>
+        <mass>0.427</mass>
+        <inertia>
+          <ixx>0.0006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0003</iyy>
+          <iyz>0</iyz>
+          <izz>0.0003</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="thruster_5_visual">
+        <pose>0 0 0 0 1.5707963268 0</pose>
+
+        <geometry>
+          <cylinder>
+            <radius>0.050</radius>
+            <length>0.113</length>
+          </cylinder>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+    </link>
+
+    <joint name="thruster_5_joint" type="revolute">
+      <parent>main_body</parent>
+      <child>thruster_5</child>
+
+      <axis>
+        <xyz>1 0 0</xyz>
+      </axis>
+    </joint>
+
+    <!-- <plugin
+      filename="ignition-gazebo-thruster-system"
+      name="ignition::gazebo::systems::Thruster">
+      <namespace>orca_auv</namespace>
+      <topic>thruster_5/set_output_force_N</topic>
+
+      <joint_name>thruster_5_joint</joint_name>
+
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.076</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+    </plugin> -->
+
+    <!-- thruster_5 end -->
+
+    <!-- thruster_6 begin -->
+
+    <link name="thruster_6">
+
+      <pose relative_to="main_body">-0.29651 0.213 0 0 0 0.7853981634</pose>
+
+      <inertial>
+        <mass>0.427</mass>
+        <inertia>
+          <ixx>0.0006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0003</iyy>
+          <iyz>0</iyz>
+          <izz>0.0003</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="thruster_6_visual">
+        <pose>0 0 0 0 1.5707963268 0</pose>
+
+        <geometry>
+          <cylinder>
+            <radius>0.050</radius>
+            <length>0.113</length>
+          </cylinder>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+    </link>
+
+    <joint name="thruster_6_joint" type="revolute">
+      <parent>main_body</parent>
+      <child>thruster_6</child>
+
+      <axis>
+        <xyz>1 0 0</xyz>
+      </axis>
+    </joint>
+
+    <!-- <plugin
+      filename="ignition-gazebo-thruster-system"
+      name="ignition::gazebo::systems::Thruster">
+      <namespace>orca_auv</namespace>
+      <topic>thruster_6/set_output_force_N</topic>
+
+      <joint_name>thruster_6_joint</joint_name>
+
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.076</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+    </plugin> -->
+
+    <!-- thruster_6 end -->
+
+    <!-- thruster_7 begin -->
+
+    <link name="thruster_7">
+
+      <pose relative_to="main_body">-0.29651 -0.213 0 0 0 -0.7853981634</pose>
+
+      <inertial>
+        <mass>0.427</mass>
+        <inertia>
+          <ixx>0.0006</ixx>
+          <ixy>0</ixy>
+          <ixz>0</ixz>
+          <iyy>0.0003</iyy>
+          <iyz>0</iyz>
+          <izz>0.0003</izz>
+        </inertia>
+      </inertial>
+
+      <visual name="thruster_7_visual">
+        <pose>0 0 0 0 1.5707963268 0</pose>
+
+        <geometry>
+          <cylinder>
+            <radius>0.050</radius>
+            <length>0.113</length>
+          </cylinder>
+        </geometry>
+
+        <material>
+          <ambient>0.0 0.0 0.0 1.0</ambient>
+          <diffuse>0.0 0.0 0.0 1.0</diffuse>
+          <specular>0.25 0.25 0.25 1.0</specular>
+        </material>
+      </visual>
+
+    </link>
+
+    <joint name="thruster_7_joint" type="revolute">
+      <parent>main_body</parent>
+      <child>thruster_7</child>
+
+      <axis>
+        <xyz>1 0 0</xyz>
+      </axis>
+    </joint>
+
+    <!-- <plugin
+      filename="ignition-gazebo-thruster-system"
+      name="ignition::gazebo::systems::Thruster">
+      <namespace>orca_auv</namespace>
+      <topic>thruster_7/set_output_force_N</topic>
+
+      <joint_name>thruster_7_joint</joint_name>
+
+      <fluid_density>1000</fluid_density>
+      <propeller_diameter>0.076</propeller_diameter>
+      <thrust_coefficient>1.0</thrust_coefficient>
+    </plugin> -->
+
+    <!-- thruster_7 end -->
+
+  </model>
+</sdf>

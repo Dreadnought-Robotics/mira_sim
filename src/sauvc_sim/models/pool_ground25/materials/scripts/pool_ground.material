@@ -1,0 +1,19 @@
+material PoolGround/Lanes
+{
+  technique
+  {
+    pass
+    {
+      ambient 0.7 0.8 0.9 1.0
+      diffuse 0.7 0.8 0.9 1.0
+      specular 0.3 0.3 0.3 1.0 12.5
+      
+      texture_unit
+      {
+        texture pool_lanes.png
+        tex_address_mode wrap
+        filtering trilinear
+      }
+    }
+  }
+}

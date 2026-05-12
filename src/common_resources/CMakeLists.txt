@@ -33,4 +33,12 @@ install(DIRECTORY
   DESTINATION share/${PROJECT_NAME}/
 )
 
+# Install mesh files into their Gazebo model directories
+install(FILES data/object_files/pipe1.obj DESTINATION share/${PROJECT_NAME}/data/object_files/pipe)
+install(FILES data/object_files/pipe2.png DESTINATION share/${PROJECT_NAME}/data/object_files/pipe)
+install(FILES data/aruco_tags/aruco-19.png DESTINATION share/${PROJECT_NAME}/data/object_files/pipe)
+install(FILES data/object_files/structure.obj DESTINATION share/${PROJECT_NAME}/data/object_files/structure)
+
+ament_environment_hooks("${CMAKE_CURRENT_SOURCE_DIR}/hooks/common_resources.dsv.in")
+
 ament_package()

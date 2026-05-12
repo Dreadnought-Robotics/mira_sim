@@ -1,0 +1,33 @@
+<?xml version='1.0'?>
+<sdf version='1.7'>
+  <model name='structure'>
+    <static>true</static>
+    <link name='link'>
+      <pose>0 0 0 1.5708 0 0</pose>
+      <visual name='visual'>
+        <geometry>
+          <mesh>
+            <uri>model://structure/structure.obj</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>1.0 0.9 0.0 1</diffuse>
+          <specular>0.3 0.3 0.3 1</specular>
+          <pbr>
+            <metal>
+              <metalness>0.0</metalness>
+              <roughness>0.3</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+      <collision name='collision'>
+        <geometry>
+          <mesh>
+            <uri>model://structure/structure.obj</uri>
+          </mesh>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

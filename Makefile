@@ -1,4 +1,4 @@
-.PHONY: master alt_master build source install-deps submodules update install-udev bs fix-vscode dashboard telemetry-viz
+.PHONY: master alt_master build source install-deps submodules update install-udev bs fix-vscode dashboard telemetry-viz simulator-tacc-gz simulator-sauvc-gz
 
 export FORCE_COLOR=1
 export RCUTILS_COLORIZED_OUTPUT=1
@@ -74,6 +74,7 @@ COLCON_ARGS:= --cmake-args $(CMAKE_ARGS) \
                           --parallel-workers $(shell nproc) \
 			  --packages-skip $(SKIP_PACKAGES) \
 			  --event-handlers console_cohesion+ \
+			  --continue-on-error
 # 			  --symlink-install \
 			  # --merge-install
 
@@ -107,6 +108,14 @@ simulator-tank:
 simulator-tac-pipeline:
 	${WS} && \
 	ros2 launch dnt_simulator tac_pipeline.launch.py
+
+simulator-tacc-gz:
+	${WS} && \
+	ros2 launch dnt_simulator tacc_gz.launch.py
+
+simulator-sauvc-gz:
+	${WS} && \
+	ros2 launch sauvc_sim sauvc25_launch.py
 
 sitl:
 	${WS} && \

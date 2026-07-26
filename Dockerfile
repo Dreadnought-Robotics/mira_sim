@@ -6,7 +6,7 @@ FROM ardupilot/ardupilot-dev-base
 RUN apt-get update && apt-get install --no-install-recommends -y git; git config --global url."https://github.com/".insteadOf git://github.com/
 
 # Now grab ArduPilot from GitHub
-RUN git clone --depth=1 https://github.com/ArduPilot/ardupilot.git ardupilot
+RUN git clone --depth=1 --branch ArduSub-4.5.3 https://github.com/ArduPilot/ardupilot.git ardupilot
 WORKDIR ardupilot
 
 # Checkout the latest Copter...

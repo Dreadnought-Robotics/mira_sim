@@ -39,3 +39,8 @@ ardupilot/*.bin
 ardupilot/*.tlog
 ardupilot/*.raw
 .vscode/
+
+
+ardupilot/mav.parm
+ardupilot/mav.tlog
+ardupilot/mav.tlog.raw

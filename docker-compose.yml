@@ -1,34 +1,141 @@
 services:
   ardupilot-sitl:
-    # image: ardupilot-sitl
+    # Pulled from GHCR by default (built by .github/workflows/docker-publish.yml).
+    # Pass --build to `docker compose up`/`run`, or run `docker compose build`,
+    # to build locally instead (e.g. after editing the Dockerfile).
+    image: ghcr.io/davidnoronha1/mira_sim-ardupilot-sitl:${MIRA_SIM_TAG:-latest}
+    pull_policy: missing
     build:
-     context: .
-     dockerfile: Dockerfile
+      context: .
+      dockerfile: docker/ardupilot.Dockerfile
     platform: linux/amd64
     tty: true
+    # Higher CPU priority - SITL is timing-sensitive (lockstep JSON bridge to Gazebo)
+    cpu_shares: 2048
+    cpus: 4
+    oom_score_adj: -500
     environment:
       - VEHICLE=ArduSub
       - MODEL=vectored
       - PATH=/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
       - ./ardupilot:/ardupilot_data
+      - ./docker/ardusub_frame_config.parm:/ardusub_frame_config.parm:ro
     network_mode: host
     entrypoint: /bin/bash
+    # --custom-location and the FRAME_CONFIG=2 param file fix a verified
+    # depth-hold bug: without an explicit home location, ArduSub defaults its
+    # home/EKF-origin altitude to CMAC airfield (584m AMSL) - since the
+    # underwater barometer sim computes pressure relative to home altitude,
+    # that ~584m offset poisons the boot-time baro calibration, corrupting
+    # every depth reading for the whole session (verified: negative absolute
+    # pressure, sub-zero Kelvin temperature reported over MAVLink).
+    # The lat/lon below (63.52, 10.35) must match worlds/tacc.world's
+    # <spherical_coordinates> - it's out in Trondheimsfjorden (verified via
+    # reverse geocoding: no land features found there even at max zoom).
+    # The old value (63.446827, 10.421906) was a real street/bench in
+    # Trondheim's Lademoen neighborhood, so QGC's map (which overlays the
+    # vehicle's simulated GPS fix on real-world map tiles, independent of
+    # the Gazebo terrain) always showed the vehicle sitting on land even
+    # though it was correctly floating in water in the 3D sim.
+    # Separately, "-f vectored_6dof" alone was NOT reliably setting
+    # FRAME_CONFIG=2 in this ArduPilot checkout (confirmed via
+    # AP_Motors6DOF.cpp: FRAME_CONFIG=1 "Vectored" only mixes motors 1-6,
+    # silently leaving 2 of the model's 4 vertical thrusters unmixed).
+    # --add-param-file forces FRAME_CONFIG=2 regardless, and works across
+    # ArduPilot versions (this Dockerfile clones master unpinned, and the
+    # newer "-P/--param" flag isn't present in every checkout).
+    # QGC: --out udp:0.0.0.0:14550 broadcasts MAVLink to QGC on the host and any
+    # device on the same LAN (QGC listens on 14550 by default). The second
+    # --out on 14555 is a spare for a second GCS / MAVProxy bridge.
+    # JSON FDM bridge to Gazebo is on 127.0.0.1:9002 (--model JSON:127.0.0.1).
     command: >
       -c "
-      cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py -N -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1"
+      cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py -N -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1 --custom-location=63.520000,10.350000,0,0 --add-param-file=/ardusub_frame_config.parm --out=udp:0.0.0.0:14550 --out=udp:127.0.0.1:14550 --out=udp:0.0.0.0:14555"
+  # Primary sim: Gazebo Harmonic + the bluerov2_gz model + ardupilot_gazebo
+  # plugin (both vendored as git submodules under src/). Rendering hardware
+  # is auto-detected at container start (see docker/gazebo-entrypoint.sh) -
+  # runs on integrated graphics with a software-rendering fallback, and uses
+  # a real GPU automatically when the nvidia variant is used (see below).
   mira_sim:
+    # Pulled from GHCR by default (built by .github/workflows/docker-publish.yml).
+    # Pass --build to `docker compose up`/`run`, or run `docker compose build`,
+    # to build locally instead (e.g. after editing the Dockerfiles/submodules).
+    image: ghcr.io/davidnoronha1/mira_sim-gazebo:${MIRA_SIM_TAG:-latest}
+    pull_policy: missing
     build:
       context: .
-      dockerfile: stonefish.Dockerfile
+      dockerfile: docker/gazebo.Dockerfile
     platform: linux/amd64
+    container_name: mira_sim
+    stdin_open: true
     tty: true
     network_mode: host
+    ipc: host
+    # Higher CPU priority - Gazebo + ArduPilot plugin are both CPU-heavy
+    cpu_shares: 2048
+    cpus: 6
+    oom_score_adj: -500
     environment:
       - DISPLAY=${DISPLAY}
-      - XAUTHORITY=/root/.Xauthority
+      - XAUTHORITY=/tmp/.docker.xauth
       - QT_X11_NO_MITSHM=1
+      # GZ_SIM_SYSTEM_PLUGIN_PATH/GZ_SIM_RESOURCE_PATH are also set in the
+      # image, but re-declared here so `docker compose exec` / non-interactive
+      # shells inherit them. Extends the baked bluerov2_gz models/worlds
+      # with this project's own worlds/ and common_resources/sauvc_sim assets
+      # (bind-mounted below) so no colcon/ROS build is needed to use them.
+      - GZ_SIM_SYSTEM_PLUGIN_PATH=/workspace/ardupilot_gazebo/build
+      - GZ_SIM_RESOURCE_PATH=/workspace/bluerov2_gz/models:/workspace/bluerov2_gz/worlds:/workspace/worlds:/workspace/common_resources:/workspace/sauvc_sim/models:/workspace/sauvc_sim/worlds
+      # Also baked into the image (see docker/gazebo.Dockerfile), but
+      # re-declared here so an already-running container from an older image
+      # picks it up without a rebuild. Without it, `gz` doesn't register
+      # "sim" as a command at all (see docker/gazebo.Dockerfile comment).
+      - GZ_CONFIG_PATH=/usr/share/gz:/opt/ros/jazzy/opt/gz_sim_vendor/share/gz
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - $HOME/.Xauthority:/root/.Xauthority:rw
-    entrypoint: /bin/bash
+      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
+      - ./docker/gazebo-entrypoint.sh:/entrypoint.sh:ro
+      - ./worlds:/workspace/worlds:ro
+      - ./src/common_resources/data/object_files:/workspace/common_resources:ro
+      - ./src/sauvc_sim:/workspace/sauvc_sim:ro
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
+    command: ["bash"]
+
+  # -------------------------------------------------------------------------
+  # NVIDIA variant of mira_sim. mira_sim (above) auto-detects at entrypoint
+  # and works on both iGPU/software and discrete GPU hosts; this is the
+  # explicit NVIDIA alternative for hosts where auto-detect is insufficient
+  # or where CI needs a deterministic GPU path.
+  # Requires nvidia-container-toolkit:
+  #   https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html
+  # Usage:
+  #   docker compose up mira_sim        # auto-detect (default)
+  #   docker compose up mira-sim-gpu    # force NVIDIA / ogre2
+  # -------------------------------------------------------------------------
+  mira-sim-gpu:
+    extends: mira_sim
+    container_name: mira-sim-gpu
+    image: ghcr.io/davidnoronha1/mira_sim-gazebo:${MIRA_SIM_TAG:-latest}
+    runtime: nvidia
+    ipc: host
+    cpu_shares: 2048
+    cpus: 6
+    oom_score_adj: -500
+    environment:
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/tmp/.docker.xauth
+      - QT_X11_NO_MITSHM=1
+      - GZ_SIM_SYSTEM_PLUGIN_PATH=/workspace/ardupilot_gazebo/build
+      - GZ_SIM_RESOURCE_PATH=/workspace/bluerov2_gz/models:/workspace/bluerov2_gz/worlds:/workspace/worlds:/workspace/common_resources:/workspace/sauvc_sim/models:/workspace/sauvc_sim/worlds
+      - GZ_CONFIG_PATH=/usr/share/gz:/opt/ros/jazzy/opt/gz_sim_vendor/share/gz
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - GZ_RENDER_ENGINE=ogre2
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, compute, utility, graphics, video, display]

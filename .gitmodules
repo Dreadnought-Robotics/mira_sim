@@ -1,0 +1,9 @@
+[submodule "src/ardupilot_gazebo"]
+	path = src/ardupilot_gazebo
+	url = https://github.com/ArduPilot/ardupilot_gazebo.git
+[submodule "src/bluerov2_gz"]
+	path = src/bluerov2_gz
+	url = https://github.com/clydemcqueen/bluerov2_gz.git
+[submodule "src/sauvc_sim"]
+	path = src/sauvc_sim
+	url = https://github.com/NCTU-AUV/sauvc_sim.git

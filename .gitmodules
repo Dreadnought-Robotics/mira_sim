@@ -6,4 +6,4 @@
 	url = https://github.com/clydemcqueen/bluerov2_gz.git
 [submodule "src/sauvc_sim"]
 	path = src/sauvc_sim
-	url = https://github.com/NCTU-AUV/sauvc_sim.git
+	url = https://github.com/davidnoronha1/sauvc_sim.git

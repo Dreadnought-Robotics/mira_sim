@@ -1,4 +1,4 @@
-FROM ardupilot/ardupilot-dev-base
+FROM ardupilot/ardupilot-dev-base:edge
 
 # QGC connectivity: SITL exposes MAVLink on tcp 5760 (primary) and udp 14550
 # (QGC default). The JSON bridge to the Gazebo ArduPilotPlugin is on
@@ -14,8 +14,8 @@ FROM ardupilot/ardupilot-dev-base
 RUN apt-get update && apt-get install --no-install-recommends -y git; git config --global url."https://github.com/".insteadOf git://github.com/
 
 # Now grab ArduPilot from GitHub
-RUN git clone --depth=1 https://github.com/ArduPilot/ardupilot.git ardupilot
-WORKDIR ardupilot
+RUN git clone --depth=1 https://github.com/ArduPilot/ardupilot.git /ardupilot
+WORKDIR /ardupilot
 
 # Checkout the latest Copter...
 # RUN git checkout master

@@ -20,8 +20,11 @@ RUN cd stonefish && \
     cd build && cmake .. && \
     make -j4 && make install
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 WORKDIR /workspace
 COPY . .
 RUN rm -rf ./build ./log ./install
+RUN uv sync
 RUN /bin/bash -c "make"
 CMD ["bash"]

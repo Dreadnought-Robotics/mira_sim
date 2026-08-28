@@ -12,11 +12,12 @@ services:
       - PATH=/usr/local/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
       - ./ardupilot:/ardupilot_data
+      - ./docker/ardusub_frame_config.parm:/ardusub_frame_config.parm:ro
     network_mode: host
     entrypoint: /bin/bash
     command: >
       -c "
-      cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py -N -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1"
+      cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py -N -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1 --custom-location=56.136459,-2.706819,0,0 --add-param-file=/ardusub_frame_config.parm --out=udp:0.0.0.0:14550 --out=udp:0.0.0.0:14555"
   mira_sim:
     image: ghcr.io/dreadnought-robotics/mira_sim-stonefish:latest
     build:

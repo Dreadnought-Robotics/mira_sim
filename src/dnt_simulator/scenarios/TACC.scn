@@ -4,8 +4,8 @@
     <ned latitude="63.446827" longitude="10.421906"/>
     <ocean>
         <water density="1031.0" jerlov="0.20"/>
-        <waves height="10.0"/>
-        <particles enabled="true"/>
+        <waves height="0.0"/>
+        <particles enabled="false"/>
         <current type="uniform">
             <velocity xyz="0.1 0.1 0.0"/>
         </current>

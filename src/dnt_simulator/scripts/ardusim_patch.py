@@ -12,7 +12,7 @@ from sensor_msgs.msg import NavSatFix
 from sensor_msgs.msg import Imu
 from nav_msgs.msg import Odometry
 
-from tf_transformations import quaternion_from_euler, euler_from_quaternion
+from tf_transformations import quaternion_from_euler, euler_from_quaternion, quaternion_matrix
 
 import numpy as np
 
@@ -108,49 +108,68 @@ class Patch(Node):
         # Publish pwm message
         self.pub_pwm.publish(msg_pwm)
 
-        # Set mesasges
-        accel = (self.imu.linear_acceleration.x, self.imu.linear_acceleration.y, self.imu.linear_acceleration.z)
-        gyro = (self.imu.angular_velocity.x, self.imu.angular_velocity.y, -self.imu.angular_velocity.z)
-        
+        # --- Coordinate frames ---
+        # Stonefish world is NED (X North, Y East, Z Down), body is FRD (X forward, Y right, Z down).
+        # This matches ArduPilot SITL JSON: position NED, velocity NED (earth frame),
+        # attitude/quaternion NED-to-body (FRD), gyro/accel in body FRD.
+        # Stonefish sensors are now mounted at rpy 0 0 0 (no 180° flip), so no axis inversions needed.
+        # See Gazebo fix gazebo:worlds/tacc.world + docker/ardupilot.Dockerfile for reference.
+
+        accel = (
+            self.imu.linear_acceleration.x,
+            self.imu.linear_acceleration.y,
+            self.imu.linear_acceleration.z,
+        )
+        gyro = (
+            self.imu.angular_velocity.x,
+            self.imu.angular_velocity.y,
+            self.imu.angular_velocity.z,
+        )
+
         pose_position = (
             self.odom.pose.pose.position.x,
             self.odom.pose.pose.position.y,
-            self.odom.pose.pose.position.z
+            self.odom.pose.pose.position.z,
         )
 
-        pose_attitude = euler_from_quaternion([
+        # Odometry quaternion is NED world -> body (FRD). Send as quaternion (preferred) + euler for compatibility.
+        quat = [
             self.odom.pose.pose.orientation.x,
             self.odom.pose.pose.orientation.y,
             self.odom.pose.pose.orientation.z,
-            self.odom.pose.pose.orientation.w
-        ])
-        
-        pose_attitude = [pose_attitude[0], pose_attitude[1], pose_attitude[2]]
-        # print("Yaw:", np.rad2deg(pose_attitude[2]))
-        
-        twist_linear = (
+            self.odom.pose.pose.orientation.w,
+        ]
+        pose_attitude = list(euler_from_quaternion(quat))  # [roll, pitch, yaw] in NED
+
+        # Velocity conversion: Stonefish Odometry twist is in body (FRD) frame -> rotate to NED earth frame.
+        # v_ned = R_ned_body * v_body ; R from quaternion.
+        qx, qy, qz, qw = quat
+        # quaternion_matrix expects [x,y,z,w] and returns 4x4 homogeneous; rotation is top-left 3x3.
+        R = quaternion_matrix([qx, qy, qz, qw])[:3, :3]
+        v_body = np.array([
             self.odom.twist.twist.linear.x,
             self.odom.twist.twist.linear.y,
             self.odom.twist.twist.linear.z,
-            self.odom.twist.twist.angular.x,
-            self.odom.twist.twist.angular.y,
-            -self.odom.twist.twist.angular.z,
-        )
+        ])
+        v_ned = R.dot(v_body)
+        twist_linear = tuple(v_ned.tolist())
         
         c_time = self.get_clock().now().to_msg()
         c_time = c_time.sec + c_time.nanosec/1e9
 
-        # build JSON format
+        # build JSON format - ArduPilot JSON needs timestamp, imu (gyro/accel_body), position NED, velocity NED earth, and attitude or quaternion.
+        # We send both attitude euler and quaternion; SITL prefers quaternion when present (SIM_JSON.h: QUAT_ATT).
         IMU_fmt = {
-            "gyro" : gyro,
-            "accel_body" : accel
+            "gyro": gyro,
+            "accel_body": accel,
         }
         JSON_fmt = {
-            "timestamp" : c_time,
-            "imu" : IMU_fmt,
-            "position" : pose_position,
-            "attitude" : pose_attitude,
-            "velocity" : twist_linear,                          
+            "timestamp": c_time,
+            "imu": IMU_fmt,
+            "position": pose_position,
+            "attitude": pose_attitude,
+            "quaternion": [quat[3], quat[0], quat[1], quat[2]],  # SITL expects [w, x, y, z]
+            "velocity": twist_linear,
         }
         JSON_string = "\n" + json.dumps(JSON_fmt,separators=(',', ':')) + "\n"
 
@@ -186,8 +205,9 @@ class Patch(Node):
 def main(args=None):
     rclpy.init(args=args)
 
-    # patch = Patch(node_name="ardusim_patch")
-    patch = Patch(node_name="ardusim_patch", namespace='blueboat')
+    # Fixed from hardcoded 'blueboat' which caused subscriptions to /blueboat/* never matching /bluerov2/* launch namespace.
+    # Now correctly bridges /bluerov2/imu + /bluerov2/odometry -> SITL port 9002.
+    patch = Patch(node_name="ardusim_patch", namespace='bluerov2')
     
     rclpy.spin(patch)
 

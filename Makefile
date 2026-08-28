@@ -59,19 +59,41 @@ endif
 
 # Build the workspace
 
-# Alternativley you can use mold which is a bit faster
-LINKER=lld
+# Detect ninja and lld; use if available, fallback gracefully.
+# In CI (GITHUB_ACTIONS=true) we require them for speed/reproducibility.
+NINJA_EXISTS := $(shell command -v ninja 2>/dev/null)
+LLD_EXISTS := $(shell command -v lld 2>/dev/null || command -v ld.lld 2>/dev/null)
+
+# Ninja generator (optional) - only if installed, else fallback to Unix Makefiles
+# No hard requirement in CI or locally; just print status (per user: don't install unnecessary stuff)
+ifdef NINJA_EXISTS
+  NINJA_FLAG := -GNinja
+  $(info ✅ Ninja found at $(NINJA_EXISTS) - using -GNinja)
+else
+  NINJA_FLAG :=
+  $(info ⚠️  Ninja not found - using default Unix Makefiles generator (install ninja-build for faster builds if desired))
+endif
+
+# lld/mold linker (optional, faster) - only if installed
+ifdef LLD_EXISTS
+  LINKER := lld
+  LLD_FLAGS := -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=$(LINKER) -DCMAKE_MODULE_LINKER_FLAGS=-fuse-ld=$(LINKER) -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=$(LINKER)
+  $(info ✅ lld found at $(LLD_EXISTS) - using -fuse-ld=lld)
+else
+  LLD_FLAGS :=
+  $(info ⚠️  lld not found - using default linker (install lld/mold for faster links if desired))
+endif
+
+# Alternatively you can use mold which is a bit faster (set LINKER=mold if installed)
 CMAKE_ARGS:= -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
 			 -DCMAKE_COLOR_DIAGNOSTICS=ON \
-			 -GNinja \
-			 -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=$(LINKER) \
-			 -DCMAKE_MODULE_LINKER_FLAGS=-fuse-ld=$(LINKER) \
-			 -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=$(LINKER) \
+			 $(NINJA_FLAG) \
+			 $(LLD_FLAGS) \
 			 --no-warn-unused-cli
 
 SKIP_PACKAGES ?= vision_boundingbox vision_depth
 COLCON_ARGS:= --cmake-args $(CMAKE_ARGS) \
-                          --parallel-workers $(shell nproc) \
+                           --parallel-workers $(shell nproc) \
 			  --packages-skip $(SKIP_PACKAGES) \
 			  --event-handlers console_cohesion+ \
 # 			  --symlink-install \
@@ -89,24 +111,49 @@ repoversion:
 	$(info Last commit in repository:)
 	@git log -1 --oneline
 
+# Perf profiles: auto (detect GPU/CPU), nogpu (software), low, medium, high
+# Usage: make simulator-sauvc PROFILE=high  or  STONEFISH_PROFILE=nogpu make simulator-tac
+# Auto-detect mirrors Gazebo entrypoint (nvidia-smi / /dev/dri) + python perf_profiles.py
+PROFILE ?= auto
+export STONEFISH_PROFILE ?= $(PROFILE)
+
 simulator-sauvc:
 	${WS} && \
-	ros2 launch dnt_simulator sauvc.launch.py
+	ros2 launch dnt_simulator sauvc.launch.py profile:=$(PROFILE)
 
 simulator-tac:
 	${WS} && \
-	ros2 launch dnt_simulator tac.launch.py
+	ros2 launch dnt_simulator tac.launch.py profile:=$(PROFILE)
 
 simulator-tac-docking:
 	${WS} && \
-	ros2 launch dnt_simulator tac_docking.launch.py
+	ros2 launch dnt_simulator tac_docking.launch.py profile:=$(PROFILE)
 
 simulator-tank:
 	${WS} && \
-	ros2 launch dnt_simulator bluerov2_sim.py
+	ros2 launch dnt_simulator bluerov2_sim.py profile:=$(PROFILE)
 simulator-tac-pipeline:
 	${WS} && \
-	ros2 launch dnt_simulator tac_pipeline.launch.py
+	ros2 launch dnt_simulator tac_pipeline.launch.py profile:=$(PROFILE)
+
+# Convenience aliases for each profile (e.g. make simulator-sauvc-low)
+simulator-sauvc-nogpu: ; $(MAKE) simulator-sauvc PROFILE=nogpu
+simulator-sauvc-low: ; $(MAKE) simulator-sauvc PROFILE=low
+simulator-sauvc-medium: ; $(MAKE) simulator-sauvc PROFILE=medium
+simulator-sauvc-high: ; $(MAKE) simulator-sauvc PROFILE=high
+simulator-tac-nogpu: ; $(MAKE) simulator-tac PROFILE=nogpu
+simulator-tac-low: ; $(MAKE) simulator-tac PROFILE=low
+simulator-tac-medium: ; $(MAKE) simulator-tac PROFILE=medium
+simulator-tac-high: ; $(MAKE) simulator-tac PROFILE=high
+simulator-tank-nogpu: ; $(MAKE) simulator-tank PROFILE=nogpu
+simulator-tank-low: ; $(MAKE) simulator-tank PROFILE=low
+simulator-tank-medium: ; $(MAKE) simulator-tank PROFILE=medium
+simulator-tank-high: ; $(MAKE) simulator-tank PROFILE=high
+
+# Show detected profile
+detect-profile:
+	@python3 -c "import sys; sys.path.insert(0,'src/dnt_simulator'); from dnt_simulator.perf_profiles import detect_profile, PROFILES; p=detect_profile(); print(f'Detected profile: {p}'); print(PROFILES[p])" 2>/dev/null || echo "Run 'make build' first or check python path"
+	@echo "Override: make simulator-sauvc PROFILE=high  |  STONEFISH_PROFILE=nogpu make simulator-tac"
 
 sitl:
 	${WS} && \
@@ -267,7 +314,7 @@ clean:
 # Help target
 help:
 	$(info Available targets:)
-	$(info   build         - Build the ROS workspace)
+	$(info   build         - Build the ROS workspace (auto-detects ninja/lld, falls back if missing))
 	$(info   source        - Source the workspace environment)
 	$(info   install-deps  - Install ROS dependencies with rosdep)
 	$(info   submodules    - Update git submodules)
@@ -281,10 +328,19 @@ help:
 	$(info   setup         - Complete workspace setup)
 	$(info   clean         - Clean build artifacts)
 	$(info )
+	$(info Stonefish perf profiles (auto-detect GPU/CPU, or set PROFILE=):)
+	$(info   nogpu         - Software rendering 60Hz 640x480 low (LIBGL_ALWAYS_SOFTWARE))
+	$(info   low           - iGPU/low-end 80Hz 800x600 low)
+	$(info   medium        - Balanced default 100Hz 960x600 low (auto))
+	$(info   high          - Discrete GPU 200Hz 1280x720 high)
+	$(info   Usage: make simulator-sauvc PROFILE=high | PROFILE=nogpu make simulator-tac | ros2 launch dnt_simulator sauvc.launch.py profile:=medium)
+	$(info   Detect: make detect-profile)
+	$(info )
 	$(info ROS Launch targets:)
 	$(info   master        - Launch master control)
 	$(info   alt_master    - Launch alternative master control)
 	$(info   teleop        - Launch teleoperation)
+	$(info   simulator-sauvc/tac/tank - Launch with PROFILE=$(PROFILE) (default auto))
 	$(info )
 	$(info Dashboard applications:)
 	$(info   dashboard     - Launch main dashboard)

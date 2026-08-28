@@ -1,6 +1,6 @@
 services:
   ardupilot-sitl:
-    image: ghcr.io/dreadnought-robotics/mira_sim-ardupilot-sitl:latest
+    image: ${GHCR_NAMESPACE:-ghcr.io/davidnoronha1/mira_sim}-ardupilot-sitl:${IMAGE_TAG:-latest}
     build:
      context: .
      dockerfile: Dockerfile
@@ -19,7 +19,7 @@ services:
       -c "
       cd /ardupilot_data && /ardupilot/Tools/autotest/sim_vehicle.py -N -f vectored_6dof -v ArduSub --console --model JSON:127.0.0.1 --custom-location=56.136459,-2.706819,0,0 --add-param-file=/ardusub_frame_config.parm --out=udp:0.0.0.0:14550 --out=udp:0.0.0.0:14555"
   mira_sim:
-    image: ghcr.io/dreadnought-robotics/mira_sim-stonefish:latest
+    image: ${GHCR_NAMESPACE:-ghcr.io/davidnoronha1/mira_sim}-stonefish:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: stonefish.Dockerfile

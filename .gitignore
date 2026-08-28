@@ -1,6 +1,8 @@
 # Ignore build directory
 build/
 
+ardupilot/
+
 # Ignore install directory
 install/
 

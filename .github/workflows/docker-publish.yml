@@ -6,6 +6,10 @@ on:
     types: [closed]       # Only merged PRs build an image, not every open/sync
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
   REGISTRY: ghcr.io
 

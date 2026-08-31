@@ -3,6 +3,7 @@ name = "sim"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
+license = { text = "Apache-2.0" }
 requires-python = ">=3.12"
 dependencies = [
     "catkin-pkg>=1.0.0",

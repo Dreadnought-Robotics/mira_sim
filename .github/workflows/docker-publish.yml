@@ -5,6 +5,7 @@ on:
   pull_request:
     types: [closed]       # Only merged PRs build an image, not every open/sync
   workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -24,18 +25,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # ArduPilot SITL (vectored_6dof, JSON FDM bridge on 127.0.0.1:9002, QGC on 14550)
-          # Dockerfile: docker/ardupilot.Dockerfile, context: repo root (needs docker/ardusub_frame_config.parm)
           - image: ardupilot-sitl
-            context: .
-            dockerfile: docker/ardupilot.Dockerfile
-          # Gazebo Harmonic + ArduPilot bridge plugin + bluerov2_gz models
-          # Minimal build-only Dockerfile: docker/gazebo.Dockerfile, context: repo root
-          # (needs src/ardupilot_gazebo + src/bluerov2_gz vendored at /workspace)
-          # Single image serves both mira_sim (auto-detect) and mira-sim-gpu (nvidia runtime via compose)
-          - image: gazebo
-            context: .
-            dockerfile: docker/gazebo.Dockerfile
+            dockerfile: Dockerfile
+          - image: stonefish
+            dockerfile: stonefish.Dockerfile
 
     steps:
       - name: Checkout
@@ -71,11 +64,11 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.context }}/${{ matrix.dockerfile }}
+          context: .
+          file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

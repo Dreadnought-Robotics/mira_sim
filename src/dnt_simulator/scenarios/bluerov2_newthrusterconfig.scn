@@ -1,0 +1,288 @@
+<?xml version="1.0"?>
+<scenario>
+	<looks>
+		<look name="br2" gray="1.0" roughness="0.4" metalness="0.5" texture="bluerov2/br2.png"/>
+		<look name="blue" rgb="0.0 0.5 1.0" roughness="0.3"/>
+		<look name="black" rgb="0.0 0.0 0.0" roughness="0.3"/>
+	</looks>
+
+	<robot name="$(arg vehicle_name)" fixed="false" self_collisions="false">
+		<base_link name="base_link" type="compound" physics="submerged">
+			<external_part name="HullBottom" type="model" physics="submerged" buoyant="false">
+				<physical>
+					<mesh filename="bluerov2/bluerov2_phy.obj" scale="1"/>
+					<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+					<thickness value="0.005"/>
+				</physical>
+				<visual>
+					<mesh filename="bluerov2/bluerov2.obj" scale="1"/>
+					<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+				</visual>
+				<material name="Fiberglass"/>
+				<look name="br2"/>
+				<compound_transform rpy="0 0.0 0.0" xyz="-0.0 0.0 0.0"/>
+			</external_part>
+
+			<external_part name="HeavyFit" type="model" physics="submerged" buoyant="false">
+				<physical>
+					<mesh filename="bluerov2/bluerov2_ring.obj" scale="1"/>
+					<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.03"/>
+					<thickness value="0.005"/>
+				</physical>
+				<visual>
+					<mesh filename="bluerov2/bluerov2_wings.obj" scale="1"/>
+					<origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+				</visual>
+				<material name="Fiberglass"/>
+				<look name="black"/>
+				<compound_transform rpy="0 0.0 0.0" xyz="-0.0 0.0 0.0"/>
+			</external_part>
+
+			<internal_part name="BackLeft" type="box" physics="submerged" buoyant="true">
+				<dimensions xyz="0.2 0.15 0.091"/>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<material name="Neutral"/>
+				<look name="None"/>
+				<mass value="0.025"/>
+				<compound_transform rpy="0.0 0.0 0.0" xyz="-0.1 -0.1 0.0"/>
+			</internal_part>
+
+			<internal_part name="BackRight" type="box" physics="submerged" buoyant="true">
+				<dimensions xyz="0.2 0.15 0.091"/>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<material name="Neutral"/>
+				<look name="None"/>
+				<mass value="0.025"/>
+				<compound_transform rpy="0.0 0.0 0.0" xyz="-0.1 0.1 0.0"/>
+			</internal_part>
+
+			<internal_part name="FrontLeft" type="box" physics="submerged" buoyant="true">
+				<dimensions xyz="0.2 0.15 0.091"/>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<material name="Neutral"/>
+				<look name="None"/>
+				<mass value="0.025"/>
+				<compound_transform rpy="0.0 0.0 0.0" xyz="0.09 -0.1 0.0"/>
+			</internal_part>
+
+			<internal_part name="FrontRight" type="box" physics="submerged" buoyant="true">
+				<dimensions xyz="0.2 0.15 0.091"/>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<material name="Neutral"/>
+				<look name="None"/>
+				<mass value="0.025"/>
+				<compound_transform rpy="0.0 0.0 0.0" xyz="0.09 0.1 0.0"/>
+			</internal_part>
+
+			<internal_part name="WeightCenter" type="sphere" physics="submerged" buoyant="false">
+				<dimensions radius="0.01"/>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<material name="Steel"/>
+				<look name="black"/>
+				<mass value="2"/>
+				<compound_transform rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.1"/>
+			</internal_part>
+
+			<internal_part name="WeightLeft" type="sphere" physics="submerged" buoyant="false">
+				<dimensions radius="0.01"/>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<material name="Steel"/>
+				<look name="black"/>
+				<mass value="1"/>
+				<compound_transform rpy="0.0 0.0 0.0" xyz="0.0 -0.075 0.1"/>
+			</internal_part>
+
+			<internal_part name="WeightRight" type="sphere" physics="submerged" buoyant="false">
+				<dimensions radius="0.01"/>
+				<origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+				<material name="Steel"/>
+				<look name="black"/>
+				<mass value="1"/>
+				<compound_transform rpy="0.0 0.0 0.0" xyz="0.0 0.075 0.1"/>
+			</internal_part>
+		</base_link>
+		
+		<!-- Thruster 1 -->
+		<actuator name="FrontRight" type="thruster">
+			<link name="base_link"/>
+			<origin xyz="0.1355 0.1 0.0725" rpy="0 0 -0.7853981634"/>
+			<specs max_setpoint="50.0" inverted_setpoint="true" normalized_setpoint="true"/>
+			<propeller diameter="0.076" right="true">
+				<mesh filename="bluerov2/ccw.obj" scale="1.0"/>
+				<material name="Neutral"/>
+				<look name="blue"/>
+			</propeller>
+			<rotor_dynamics type="zero_order"/>
+			<thrust_model type="linear_interpolation">
+				<input value="-40.0 -20.0 0.0 20.0 40.0"/>
+				<output value="-40.0 -20.0 0.0 20.0 40.0"/>
+			</thrust_model>
+		</actuator>
+
+		<!-- Thruster 2 -->
+		<actuator name="FrontLeft" type="thruster">
+			<link name="base_link"/>
+			<origin xyz="0.1355 -0.1 0.0725" rpy="0 0 0.7853981634"/>
+			<specs max_setpoint="50.0" inverted_setpoint="true" normalized_setpoint="true"/>
+			<propeller diameter="0.076" right="true">
+				<mesh filename="bluerov2/ccw.obj" scale="1.0"/>
+				<material name="Neutral"/>
+				<look name="blue"/>
+			</propeller>
+			<rotor_dynamics type="zero_order"/>
+			<thrust_model type="linear_interpolation">
+				<input value="-40.0 -20.0 0.0 20.0 40.0"/>
+				<output value="-40.0 -20.0 0.0 20.0 40.0"/>
+			</thrust_model>
+		</actuator>
+
+		<!-- Thruster 3 -->
+		<actuator name="BackRight" type="thruster">
+			<link name="base_link"/>
+			<origin xyz="-0.1475 0.1 0.0725" rpy="0 0 -2.3561944902"/>
+			<specs max_setpoint="50.0" inverted_setpoint="false" normalized_setpoint="true"/>
+			<propeller diameter="0.076" right="true">
+				<mesh filename="bluerov2/cw.obj" scale="1.0"/>
+				<material name="Neutral"/>
+				<look name="blue"/>
+			</propeller>
+			<rotor_dynamics type="zero_order"/>
+			<thrust_model type="linear_interpolation">
+				<input value="-40.0 -20.0 0.0 20.0 40.0"/>
+				<output value="-40.0 -20.0 0.0 20.0 40.0"/>
+			</thrust_model>
+		</actuator>
+
+		<!-- Thruster 4 -->
+		<actuator name="BackLeft" type="thruster">
+			<link name="base_link"/>
+			<origin xyz="-0.1475 -0.1 0.0725" rpy="0 0 2.3561944902"/>
+			<specs max_setpoint="50.0" inverted_setpoint="false" normalized_setpoint="true"/>
+			<propeller diameter="0.076" right="true">
+				<mesh filename="bluerov2/cw.obj" scale="1.0"/>
+				<material name="Neutral"/>
+				<look name="blue"/>
+			</propeller>
+			<rotor_dynamics type="zero_order"/>
+			<thrust_model type="linear_interpolation">
+				<input value="-40.0 -20.0 0.0 20.0 40.0"/>
+				<output value="-40.0 -20.0 0.0 20.0 40.0"/>
+			</thrust_model>
+		</actuator>
+
+		<!-- Thruster 5 -->
+		<actuator name="DiveFrontRight" type="thruster">
+			<link name="base_link"/>
+			<origin xyz="0.12 0.218 0.0" rpy="0 -1.5707963268 0"/>
+			<specs max_setpoint="50.0" inverted_setpoint="false" normalized_setpoint="true"/>
+			<propeller diameter="0.076" right="false">
+				<mesh filename="bluerov2/cw.obj" scale="1.0"/>
+				<material name="Neutral"/>
+				<look name="blue"/>
+			</propeller>
+			<rotor_dynamics type="zero_order"/>
+			<thrust_model type="linear_interpolation">
+				<input value="-40.0 -20.0 0.0 20.0 40.0"/>
+				<output value="-40.0 -20.0 0.0 20.0 40.0"/>
+			</thrust_model>
+		</actuator>
+
+		<!-- Thruster 6 -->
+		<actuator name="DiveFrontLeft" type="thruster">
+			<link name="base_link"/>
+			<origin xyz="0.12 -0.218 0.0" rpy="0 -1.5707963268 0"/>
+			<specs max_setpoint="50.0" inverted_setpoint="true" normalized_setpoint="true"/>
+			<propeller diameter="0.076" right="false">
+				<mesh filename="bluerov2/ccw.obj" scale="1.0"/>
+				<material name="Neutral"/>
+				<look name="blue"/>
+			</propeller>
+			<rotor_dynamics type="zero_order"/>
+			<thrust_model type="linear_interpolation">
+				<input value="-40.0 -20.0 0.0 20.0 40.0"/>
+				<output value="-40.0 -20.0 0.0 20.0 40.0"/>
+			</thrust_model>
+		</actuator>
+		
+		<!-- Thruster 7 -->
+		<actuator name="DiveBackRight" type="thruster">
+			<link name="base_link"/>
+			<origin xyz="-0.12 0.218 0.0" rpy="0 -1.5707963268 0"/>
+			<specs max_setpoint="50.0" inverted_setpoint="true" normalized_setpoint="true"/>
+			<propeller diameter="0.076" right="false">
+				<mesh filename="bluerov2/ccw.obj" scale="1.0"/>
+				<material name="Neutral"/>
+				<look name="blue"/>
+			</propeller>
+			<rotor_dynamics type="zero_order"/>
+			<thrust_model type="linear_interpolation">
+				<input value="-40.0 -20.0 0.0 20.0 40.0"/>
+				<output value="-40.0 -20.0 0.0 20.0 40.0"/>
+			</thrust_model>
+		</actuator>
+
+		<!-- Thruster 8 -->
+		<actuator name="DiveBackLeft" type="thruster">
+			<link name="base_link"/>
+			<origin xyz="-0.12 -0.218 0.0" rpy="0 -1.5707963268 0"/>
+			<specs max_setpoint="50.0" inverted_setpoint="false" normalized_setpoint="true"/>
+			<propeller diameter="0.076" right="false">
+				<mesh filename="bluerov2/cw.obj" scale="1.0"/>
+				<material name="Neutral"/>
+				<look name="blue"/>
+			</propeller>
+			<rotor_dynamics type="zero_order"/>
+			<thrust_model type="linear_interpolation">
+				<input value="-40.0 -20.0 0.0 20.0 40.0"/>
+				<output value="-40.0 -20.0 0.0 20.0 40.0"/>
+			</thrust_model>
+		</actuator>
+
+		<light name="FrontLightRight">
+			<link name="base_link"/>
+			<origin xyz="0.176 0.14 0.116" rpy="0.0 1.5 0.0"/>
+			<specs illuminance="100.0" radius="0.015" cone_angle="70.0"/>
+			<color rgb="255.0 255.0 255.0"/>
+		</light>
+
+		<light name="FrontLightLeft">
+			<link name="base_link"/>
+			<origin xyz="0.176 -0.14 0.116" rpy="0.0 1.5 0.0"/>
+			<specs illuminance="100.0" radius="0.015" cone_angle="70.0"/>
+			<color rgb="255.0 255.0 255.0"/>
+		</light>
+
+		<sensor name="odometry" type="odometry" rate="120.0">
+			<noise position="0.00" velocity="0.00" angle="0.0" angular_velocity="0.00"/>
+			<history value="10"/>
+			<link name="base_link"/>
+			<origin rpy="3.1416 0.0 0.0" xyz="0.0 0.0 0.0"/>
+			<ros_publisher topic="/$(arg vehicle_name)/odometry"/>
+		</sensor>
+
+		<sensor name="imu_filter" type="imu" rate="120.0">
+			<link name="base_link"/>
+			<origin rpy="3.14 0.0 0.0" xyz="0.0 0.0 0.0"/>
+			<noise angle="0.000000" angular_velocity="0.0000"/>
+			<ros_publisher topic="/$(arg vehicle_name)/imu"/>
+		</sensor>
+
+		<sensor name="camera_left" rate="30.0" type="camera">
+			<specs resolution_x="640" resolution_y="480" horizontal_fov="75.0"/>
+			<origin xyz="0.16 -0.0725 0.15" rpy="1.571 0.0 1.571"/>
+			<link name="base_link"/>
+			<ros_publisher topic="/bluerov2/left"/>
+		</sensor>
+		<sensor name="camera_right" rate="30.0" type="camera">
+			<specs resolution_x="640" resolution_y="480" horizontal_fov="75.0" baseline="-60.5"/>
+			<origin xyz="0.16 0.0725 0.15" rpy="1.571 0.0 1.571"/>
+			<link name="base_link"/>
+			<ros_publisher topic="/bluerov2/right"/>
+		</sensor>
+
+		<world_transform xyz="$(arg position)" rpy="$(arg orientation)"/>
+
+		<ros_subscriber thrusters="/$(arg vehicle_name)/thrusters"/>
+		<ros_publisher thrusters="/$(arg vehicle_name)/thruster_state"/>
+	</robot>
+</scenario>

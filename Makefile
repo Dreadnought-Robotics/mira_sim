@@ -1,15 +1,8 @@
-.PHONY: master alt_master build source install-deps submodules update install-udev bs fix-vscode dashboard telemetry-viz simulator-tacc-gz simulator-sauvc-gz sitl shell bringup-tacc bringup-sauvc bringdown
+.PHONY: master alt_master build source install-deps submodules update install-udev bs fix-vscode dashboard telemetry-viz
 
 export FORCE_COLOR=1
 export RCUTILS_COLORIZED_OUTPUT=1
 export RCUTILS_CONSOLE_OUTPUT_FORMAT={severity} {message}
-# docker-compose.yml sets ipc: host on the sim container so X11/Qt can share
-# memory with the host, but that also makes FastDDS try its shared-memory
-# transport for ROS2 between host processes and the container - which does
-# not work across that boundary (nodes on one side can't discover the other
-# at all). Forcing UDP-only here keeps any host-side `ros2 run`/`launch`
-# consistent with the container's matching FASTDDS_BUILTIN_TRANSPORTS.
-export FASTDDS_BUILTIN_TRANSPORTS=UDPv4
 SHELL := /bin/bash
 
 WS := source .venv/bin/activate && source install/setup.bash
@@ -38,10 +31,6 @@ else
 endif
 
 # ---- Python checks ----
-ifdef VIRTUAL_ENV
-	$(error ❌ Active virtual environment detected ($(VIRTUAL_ENV)). Please run 'deactivate' before running make)
-endif
-
 ifeq ($(PYTHON3_PATH),)
 	$(error ❌ python3 not found in PATH)
 endif
@@ -50,9 +39,12 @@ ifeq ($(PYTHON312_PATH),)
 	$(error ❌ python3.12 not found in PATH)
 endif
 
-IS_VENV := $(shell python3 -c "import sys; print(1 if sys.prefix != getattr(sys, 'base_prefix', sys.prefix) else 0)" 2>/dev/null)
-ifeq ($(IS_VENV),1)
-	$(error ❌ python3 is running inside a virtual environment ($(PYTHON3_PATH)). Please deactivate the virtual environment before running make)
+ifneq ($(PYTHON3_PATH),/usr/bin/python3)
+	$(error ❌ python3 resolves to $(PYTHON3_PATH). Expected /usr/bin/python3 (not ~/.local/bin))
+endif
+
+ifneq ($(PYTHON312_PATH),/usr/bin/python3.12)
+	$(error ❌ python3.12 resolves to $(PYTHON312_PATH). Expected /usr/bin/python3.12 (not ~/.local/bin))
 endif
 
 $(info ✅ python3     → $(PYTHON3_PATH))
@@ -104,7 +96,6 @@ COLCON_ARGS:= --cmake-args $(CMAKE_ARGS) \
                            --parallel-workers $(shell nproc) \
 			  --packages-skip $(SKIP_PACKAGES) \
 			  --event-handlers console_cohesion+ \
-			  --continue-on-error
 # 			  --symlink-install \
 			  # --merge-install
 
@@ -120,138 +111,53 @@ repoversion:
 	$(info Last commit in repository:)
 	@git log -1 --oneline
 
-# --- Gazebo simulators (primary; fully containerized, no host ROS needed) ---
-# ArduPilotPlugin talks to ArduSub over JSON/UDP (see the `sitl` target),
-# no ROS bridge required for basic vehicle control / depth hold.
-# Containers are persistent: `up --no-recreate` keeps the named container
-# across runs so Ctrl-C stops it without removing it. Use
-# `docker compose build` or `docker compose up --build --no-recreate` after
-# editing Dockerfiles/submodules.
-#
-# GZ_SERVICE auto-selects the correct compose service based on host hardware:
-#   - mira-sim-gpu  if nvidia-smi is present and reports a GPU
-#   - mira_sim      otherwise (iGPU / software / llvmpipe fallback)
-# The same image is used for both; the gpu variant just adds
-# Override with:
-#   make simulator-tacc-gz GZ_SERVICE=mira_sim
-#   make simulator-tacc-gz GZ_SERVICE=mira-sim-gpu
-#   MIRA_GPU=1 make simulator-tacc-gz   (force gpu)
-#   MIRA_GPU=0 make simulator-tacc-gz   (force nogpu)
-GZ_ARGS ?= -v3 -r
-XAUTH := /tmp/.docker.xauth
+# Perf profiles: auto (detect GPU/CPU), nogpu (software), low, medium, high
+# Usage: make simulator-sauvc PROFILE=high  or  STONEFISH_PROFILE=nogpu make simulator-tac
+# Auto-detect mirrors Gazebo entrypoint (nvidia-smi / /dev/dri) + python perf_profiles.py
+PROFILE ?= auto
+export STONEFISH_PROFILE ?= $(PROFILE)
 
-# X11 passthrough: ensure xauth cookie and xhost allowance before any
-# gazebo target. See docker/x11-setup.sh for details - it handles the
-# ffff fix, Wayland/empty DISPLAY, and xhost +local:docker fallback.
-# Also requires ipc:host + QT_X11_NO_MITSHM=1 in compose (already set).
-check-x11:
-	@bash ./docker/x11-setup.sh
-	@if [ -z "$${DISPLAY:-}" ]; then \
-		echo "⚠️  DISPLAY is empty - Gazebo GUI will not be visible (headless). Use ssh -X or set DISPLAY=:0/:1."; \
-	elif ! xauth list "$$DISPLAY" >/dev/null 2>&1; then \
-		echo "⚠️  xauth has no cookie for DISPLAY=$$DISPLAY - falling back to xhost +local:docker"; \
-		xhost +local:docker >/dev/null 2>&1 || xhost +local: >/dev/null 2>&1 || true; \
-	fi
-	@chmod a+r $(XAUTH) 2>/dev/null || true
+simulator-sauvc:
+	${WS} && \
+	ros2 launch dnt_simulator sauvc.launch.py profile:=$(PROFILE)
 
-# Explicit override via MIRA_GPU env
-ifeq ($(MIRA_GPU),1)
-  GZ_SERVICE ?= mira-sim-gpu
-else ifeq ($(MIRA_GPU),0)
-  GZ_SERVICE ?= mira_sim
-else
-  # Auto-detect: nvidia-smi present => gpu, else default
-  GZ_SERVICE ?= $(shell command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1 && echo mira-sim-gpu || echo mira_sim)
-endif
+simulator-tac:
+	${WS} && \
+	ros2 launch dnt_simulator tac.launch.py profile:=$(PROFILE)
 
-$(XAUTH): check-x11
-	@true
+simulator-tac-docking:
+	${WS} && \
+	ros2 launch dnt_simulator tac_docking.launch.py profile:=$(PROFILE)
 
-simulator-tacc-gz: $(XAUTH)
-	@echo "🚀 Gazebo service: $(GZ_SERVICE)"
-	docker compose up --no-recreate -d $(GZ_SERVICE)
-	docker compose exec $(GZ_SERVICE) bash -c "source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) /workspace/worlds/tacc.world"
+simulator-tank:
+	${WS} && \
+	ros2 launch dnt_simulator bluerov2_sim.py profile:=$(PROFILE)
+simulator-tac-pipeline:
+	${WS} && \
+	ros2 launch dnt_simulator tac_pipeline.launch.py profile:=$(PROFILE)
 
-simulator-sauvc-gz: $(XAUTH)
-	@echo "🚀 Gazebo service: $(GZ_SERVICE)"
-	docker compose up --no-recreate -d $(GZ_SERVICE)
-	docker compose exec $(GZ_SERVICE) bash -c "source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) /workspace/sauvc_sim/worlds/sauvc25.world"
+# Convenience aliases for each profile (e.g. make simulator-sauvc-low)
+simulator-sauvc-nogpu: ; $(MAKE) simulator-sauvc PROFILE=nogpu
+simulator-sauvc-low: ; $(MAKE) simulator-sauvc PROFILE=low
+simulator-sauvc-medium: ; $(MAKE) simulator-sauvc PROFILE=medium
+simulator-sauvc-high: ; $(MAKE) simulator-sauvc PROFILE=high
+simulator-tac-nogpu: ; $(MAKE) simulator-tac PROFILE=nogpu
+simulator-tac-low: ; $(MAKE) simulator-tac PROFILE=low
+simulator-tac-medium: ; $(MAKE) simulator-tac PROFILE=medium
+simulator-tac-high: ; $(MAKE) simulator-tac PROFILE=high
+simulator-tank-nogpu: ; $(MAKE) simulator-tank PROFILE=nogpu
+simulator-tank-low: ; $(MAKE) simulator-tank PROFILE=low
+simulator-tank-medium: ; $(MAKE) simulator-tank PROFILE=medium
+simulator-tank-high: ; $(MAKE) simulator-tank PROFILE=high
 
-# Both use `up --no-recreate -d` so the container is persistent:
-# Ctrl-C stops `gz sim` (the exec) without removing the container; the container
-# itself stays `Up` and is reused on next `make simulator-*` without recreation.
-# `docker compose stop $(GZ_SERVICE)` / `docker compose down` to fully stop/remove.
-# After editing Dockerfiles/submodules: `docker compose build` or
-# `docker compose up --build --no-recreate -d $(GZ_SERVICE)`
+# Show detected profile
+detect-profile:
+	@python3 -c "import sys; sys.path.insert(0,'src/dnt_simulator'); from dnt_simulator.perf_profiles import detect_profile, PROFILES; p=detect_profile(); print(f'Detected profile: {p}'); print(PROFILES[p])" 2>/dev/null || echo "Run 'make build' first or check python path"
+	@echo "Override: make simulator-sauvc PROFILE=high  |  STONEFISH_PROFILE=nogpu make simulator-tac"
 
 sitl:
-	docker compose up --no-recreate ardupilot-sitl
-
-shell: $(XAUTH)
-	@echo "🐚 Shell service: $(GZ_SERVICE)"
-	docker compose up --no-recreate -d $(GZ_SERVICE)
-	docker compose exec $(GZ_SERVICE) bash
-
-# Raw persistent attach (Ctrl-C stops container without removing it):
-#   docker compose up --no-recreate mira_sim
-# One-off gz in persistent container:
-#   docker compose exec mira_sim gz sim $(GZ_ARGS) <world>
-
-# --- Tmux bringup for competitions (persistent containers, X11 auth) ---
-# Each `make bringup-<competition>` spawns a tmux session with 3 windows:
-#   0:sitl   - docker compose up --no-recreate ardupilot-sitl (skipped if NO_ARDUPILOT=1)
-#   1:bridge - ros_gz_bridge if needed, else idle message
-#   2:gazebo - docker compose exec gz sim <world>
-# All use `up --no-recreate` so containers persist (Ctrl-C stops, not removes).
-# Attach: tmux attach -t mira-<competition>  Kill: tmux kill-session -t mira-<competition>
-TMUX := $(shell command -v tmux 2>/dev/null)
-check-tmux:
-ifndef TMUX
-	$(error ❌ tmux not found. Install with: sudo apt install tmux)
-endif
-
-NO_ARDUPILOT ?= 0
-ifeq ($(NO_ARDUPILOT),1)
-  SITL_CMD := echo "ArduPilot SITL disabled (NO_ARDUPILOT=1)"; exec bash
-else
-  SITL_CMD := docker compose up --no-recreate ardupilot-sitl; exec bash
-endif
-
-bringup-tacc: check-tmux $(XAUTH)
-	@if tmux has-session -t mira-tacc 2>/dev/null; then \
-		echo "⚠️  tmux session mira-tacc already exists. Attach: tmux attach -t mira-tacc | Kill: tmux kill-session -t mira-tacc"; exit 1; fi
-	@echo "🚀 Bringup TACC - tmux session mira-tacc [$(GZ_SERVICE)]$(if $(filter 1,$(NO_ARDUPILOT)), [NO_ARDUPILOT=1],)"
-	tmux new-session -d -s mira-tacc -n sitl '$(SITL_CMD)'
-	tmux new-window -t mira-tacc:1 -n bridge 'echo "No bridge required for TACC - ArduPilotPlugin handles FDM"; echo "Bridge idle"; exec bash'
-	tmux new-window -t mira-tacc:2 -n gazebo 'bash -c "docker compose up --no-recreate -d $(GZ_SERVICE) && docker compose exec $(GZ_SERVICE) bash -c \"source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) /workspace/worlds/tacc.world\"; exec bash"'
-	tmux select-window -t mira-tacc:0
-	@if [ -n "$$TMUX" ]; then tmux switch-client -t mira-tacc; else tmux attach -t mira-tacc; fi
-
-bringup-sauvc: check-tmux $(XAUTH)
-	@if tmux has-session -t mira-sauvc 2>/dev/null; then \
-		echo "⚠️  tmux session mira-sauvc already exists. Attach: tmux attach -t mira-sauvc | Kill: tmux kill-session -t mira-sauvc"; exit 1; fi
-	@echo "🚀 Bringup SAUVC - tmux session mira-sauvc [$(GZ_SERVICE)]$(if $(filter 1,$(NO_ARDUPILOT)), [NO_ARDUPILOT=1],)"
-	tmux new-session -d -s mira-sauvc -n sitl '$(SITL_CMD)'
-	
-	# Bridge runs INSIDE the mira_sim container (not on the host): ROS2/gz-transport
-	# discovery between host processes and this container's processes does not
-	# work even with network_mode:host + ipc:host (confirmed with a plain,
-	# Gazebo-free std_msgs/String pub/sub test - not a topic-name/DDS-config
-	# mismatch, some deeper participant/port issue on the shared network stack).
-	# A bridge co-located with gzserver reliably receives and republishes camera
-	# data; the same bridge run on the host never received a single frame.
-	tmux new-window -t mira-sauvc:1 -n bridge 'bash -c "echo Waiting for Gazebo to be ready...; sleep 5; docker compose up --no-recreate -d $(GZ_SERVICE) && docker compose exec $(GZ_SERVICE) bash -c \"source /opt/ros/jazzy/setup.bash && exec ros2 run ros_gz_bridge parameter_bridge /cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist /front_camera/left/image_raw@sensor_msgs/msg/Image@gz.msgs.Image /front_camera/right/image_raw@sensor_msgs/msg/Image@gz.msgs.Image /sim/front_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked /bottom_camera@sensor_msgs/msg/Image@gz.msgs.Image /side_cam@sensor_msgs/msg/Image@gz.msgs.Image /world/pool_world/create@ros_gz_interfaces/srv/SpawnEntity --ros-args -r __ns:=/sauvc_bridge\"; exec bash"'
-	tmux new-window -t mira-sauvc:2 -n gazebo 'bash -c "docker compose up --no-recreate -d $(GZ_SERVICE) && docker compose exec $(GZ_SERVICE) bash -c \"source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) /workspace/sauvc_sim/worlds/sauvc25.world\"; exec bash"'
-	tmux select-window -t mira-sauvc:0
-	@if [ -n "$$TMUX" ]; then tmux switch-client -t mira-sauvc; else tmux attach -t mira-sauvc; fi
-
-bringdown:
-	@echo "🛑 Stopping bringup containers..."
-	docker compose stop -t 0
-	@echo "🛑 Exiting tmux bringup sessions..."
-	@tmux kill-session -t mira-sauvc 2>/dev/null || true
-	@tmux kill-session -t mira-tacc 2>/dev/null || true
-	@tmux kill-session -t mira-gz 2>/dev/null || true
+	${WS} && \
+	docker-compose up ardupilot-sitl
 
 
 changed:
@@ -421,20 +327,20 @@ help:
 	$(info   fix-vscode    - Fix VSCode settings paths)
 	$(info   setup         - Complete workspace setup)
 	$(info   clean         - Clean build artifacts)
+	$(info )
+	$(info Stonefish perf profiles (auto-detect GPU/CPU, or set PROFILE=):)
+	$(info   nogpu         - Software rendering 60Hz 640x480 low (LIBGL_ALWAYS_SOFTWARE))
+	$(info   low           - iGPU/low-end 80Hz 800x600 low)
+	$(info   medium        - Balanced default 100Hz 960x600 low (auto))
+	$(info   high          - Discrete GPU 200Hz 1280x720 high)
+	$(info   Usage: make simulator-sauvc PROFILE=high | PROFILE=nogpu make simulator-tac | ros2 launch dnt_simulator sauvc.launch.py profile:=medium)
+	$(info   Detect: make detect-profile)
+	$(info )
 	$(info ROS Launch targets:)
 	$(info   master        - Launch master control)
 	$(info   alt_master    - Launch alternative master control)
 	$(info   teleop        - Launch teleoperation)
-	$(info )
-	$(info Simulator targets (Dockerized, no host ROS needed):)
-	$(info   sitl              - Run ArduSub SITL)
-	$(info   simulator-tacc-gz - Run Gazebo with the TACC pipeline world)
-	$(info   simulator-sauvc-gz - Run Gazebo with the SAUVC world)
-	$(info   bringup-tacc      - tmux 3-window bringup (sitl, bridge idle, gazebo tacc.world))
-	$(info   bringup-sauvc     - tmux 3-window bringup (sitl, bridge ros_gz_bridge, gazebo sauvc25.world))
-	$(info   bringdown         - Stop all bringup containers (-t 0))
-	$(info     Flags: NO_ARDUPILOT=1 (skip SITL))
-	$(info     Attach: tmux attach -t mira-<comp>  Detach: Ctrl-b d  Kill: tmux kill-session -t mira-<comp>)
+	$(info   simulator-sauvc/tac/tank - Launch with PROFILE=$(PROFILE) (default auto))
 	$(info )
 	$(info Dashboard applications:)
 	$(info   dashboard     - Launch main dashboard)

@@ -3,7 +3,7 @@
 	url = https://github.com/ArduPilot/ardupilot_gazebo.git
 [submodule "src/bluerov2_gz"]
 	path = src/bluerov2_gz
-	url = https://github.com/clydemcqueen/bluerov2_gz.git
+	url = https://github.com/davidnoronha1/bluerov2_gz.git
 [submodule "src/sauvc_sim"]
 	path = src/sauvc_sim
 	url = https://github.com/davidnoronha1/sauvc_sim.git

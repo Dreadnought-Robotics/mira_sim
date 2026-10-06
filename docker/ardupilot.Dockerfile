@@ -27,7 +27,7 @@ RUN git submodule update --init --recursive
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Need sudo and lsb-release for the installation prerequisites
-RUN apt-get install -y --no-install-recommends sudo lsb-release tzdata
+RUN apt-get install -y --no-install-recommends sudo lsb-release tzdata python3-venv
 
 # Continue build instructions from https://github.com/ArduPilot/ardupilot/blob/master/BUILD.md
 RUN ./waf distclean
@@ -42,8 +42,11 @@ EXPOSE 14555/udp
 EXPOSE 9002/tcp
 EXPOSE 9002/udp
 
-RUN pip3 install --no-cache-dir --break-system-packages MAVProxy pymavlink 2>/dev/null \
-  || pip3 install --no-cache-dir MAVProxy pymavlink # Install MAVProxy (Debian trixie needs --break-system-packages)
+# Install MAVProxy in a venv: the Debian-packaged numpy has no pip RECORD file, so
+# installing into the system site-packages fails with "uninstall-no-record-file".
+RUN python3 -m venv --system-site-packages /opt/mavenv \
+  && /opt/mavenv/bin/pip install --no-cache-dir MAVProxy pymavlink
+ENV PATH="/opt/mavenv/bin:${PATH}"
 
 # Default command is overridden by docker-compose.yml (which adds --custom-location,
 # --add-param-file and --out for QGC). This ENTRYPOINT remains usable for

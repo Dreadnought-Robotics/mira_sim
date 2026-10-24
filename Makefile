@@ -276,6 +276,14 @@ bringdown:
 	@tmux kill-session -t mira-tacc 2>/dev/null || true
 	@tmux kill-session -t mira-gz 2>/dev/null || true
 
+sim_master: check-ros
+	${WS} && \
+	ros2 run sim_master sim_bridge
+
+docking: check-ros
+	${WS} && \
+	ros2 launch bluerov2_control docking.launch.py
+
 
 changed:
 	@packages=$$( \

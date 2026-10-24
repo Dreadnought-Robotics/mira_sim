@@ -20,6 +20,11 @@ VENV_EXISTS := $(wildcard .venv)
 ROS_JAZZY_EXISTS := $(wildcard /opt/ros/jazzy)
 MAVPROXY_EXISTS := $(shell command -v mavproxy.py 2>/dev/null)$(shell command -v mavproxy 2>/dev/null)
 
+#-------------------------------------------------------------------------------
+# Gazebo execution mode: docker or host
+#-------------------------------------------------------------------------------
+GAZEBO_MODE ?= docker
+#-------------------------------------------------------------------------------
 all: build
 
 # Resolve python paths
@@ -140,6 +145,14 @@ repoversion:
 GZ_ARGS ?= -v3 -r
 XAUTH := /tmp/.docker.xauth
 
+ifeq ($(GAZEBO_MODE),docker)
+    GZ_PREREQ := $(XAUTH)
+else ifeq ($(GAZEBO_MODE),host)
+    GZ_PREREQ :=
+else
+    $(error Invalid GAZEBO_MODE '$(GAZEBO_MODE)'. Use docker or host)
+endif
+
 # X11 passthrough: ensure xauth cookie and xhost allowance before any
 # gazebo target. See docker/x11-setup.sh for details - it handles the
 # ffff fix, Wayland/empty DISPLAY, and xhost +local:docker fallback.
@@ -167,20 +180,81 @@ endif
 $(XAUTH): check-x11
 	@true
 
-simulator-gz: $(XAUTH)
-	@echo "🚀 Gazebo service: $(GZ_SERVICE)"
-	docker compose up --no-recreate -d $(GZ_SERVICE)
-	docker compose exec $(GZ_SERVICE) bash -c "source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) bluerov2_heavy_underwater.world"
+# World paths inside Docker
+GZ_WORLD_DOCKER ?= bluerov2_heavy_underwater.world
+TACC_WORLD_DOCKER ?= /workspace/worlds/tacc.world
+SAUVC_WORLD_DOCKER ?= /workspace/sauvc_sim/worlds/sauvc25.world
 
-simulator-tacc-gz: $(XAUTH)
-	@echo "🚀 Gazebo service: $(GZ_SERVICE)"
-	docker compose up --no-recreate -d $(GZ_SERVICE)
-	docker compose exec $(GZ_SERVICE) bash -c "source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) /workspace/worlds/tacc.world"
+# World paths on the host
+GZ_WORLD_HOST ?= bluerov2_heavy_underwater.world
+TACC_WORLD_HOST ?= src/worlds/tacc.world
+SAUVC_WORLD_HOST ?= src/sauvc_sim/worlds/sauvc25.world
 
-simulator-sauvc-gz: $(XAUTH)
-	@echo "🚀 Gazebo service: $(GZ_SERVICE)"
+#Host machine ros_gazebo brige
+GZ_BRIDGE_HEAVY_ARGS := /front_camera/left/image_raw@sensor_msgs/msg/Image@gz.msgs.Image /front_camera/right/image_raw@sensor_msgs/msg/Image@gz.msgs.Image /sim/front_camera/image@sensor_msgs/msg/Image@gz.msgs.Image /sim/front_camera/depth_image@sensor_msgs/msg/Image@gz.msgs.Image /sim/front_camera/points@sensor_msgs/msg/PointCloud2@gz.msgs.PointCloudPacked /sim/front_camera/camera_info@sensor_msgs/msg/CameraInfo@gz.msgs.CameraInfo /bottom_camera@sensor_msgs/msg/Image@gz.msgs.Image
+GZ_BRIDGE_SAUVC_ARGS := $(GZ_BRIDGE_HEAVY_ARGS)
+GZ_BRIDGE_AUV_ARGS := $(GZ_BRIDGE_HEAVY_ARGS)
+
+ifeq ($(GAZEBO_MODE),docker)
+
+simulator-gz: $(GZ_PREREQ)
 	docker compose up --no-recreate -d $(GZ_SERVICE)
-	docker compose exec $(GZ_SERVICE) bash -c "source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) /workspace/sauvc_sim/worlds/sauvc25.world"
+	docker compose exec $(GZ_SERVICE) bash -c \
+		"source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) $(GZ_WORLD_DOCKER)"
+
+simulator-tacc-gz: $(GZ_PREREQ)
+	docker compose up --no-recreate -d $(GZ_SERVICE)
+	docker compose exec $(GZ_SERVICE) bash -c \
+		"source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) $(TACC_WORLD_DOCKER)"
+
+simulator-sauvc-gz: $(GZ_PREREQ)
+	docker compose up --no-recreate -d $(GZ_SERVICE)
+	docker compose exec $(GZ_SERVICE) bash -c \
+		"source /tmp/gz-render-env.sh 2>/dev/null; exec gz sim $(GZ_ARGS) $(SAUVC_WORLD_DOCKER)"
+
+
+else
+
+host-gz-plugin:
+	@cmake -S src/ardupilot_gazebo -B src/ardupilot_gazebo/build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+	@cmake --build src/ardupilot_gazebo/build --target ArduPilotPlugin -j$$(nproc)
+
+
+simulator-gz:
+	@set -e; \
+	source /opt/ros/jazzy/setup.bash; \
+	if [ -f install/setup.bash ]; then source install/setup.bash; fi; \
+	export GZ_SIM_SYSTEM_PLUGIN_PATH="$(CURDIR)/src/ardupilot_gazebo/build:$${GZ_SIM_SYSTEM_PLUGIN_PATH}"; \
+	export GZ_SIM_RESOURCE_PATH="$(CURDIR)/src/bluerov2_gz/models:$(CURDIR)/src/bluerov2_gz/worlds:$(CURDIR)/worlds:$(CURDIR)/src/common_resources/data/object_files:$(CURDIR)/src/sauvc_sim/models:$(CURDIR)/src/sauvc_sim/worlds:$(CURDIR)/src/ardupilot_gazebo/models:$(CURDIR)/src/ardupilot_gazebo/worlds:$${GZ_SIM_RESOURCE_PATH}"; \
+	ros2 run ros_gz_bridge parameter_bridge $(GZ_BRIDGE_AUV_ARGS) --ros-args -r __ns:=/auv_bridge & \
+	bridge_pid=$$!; \
+	trap 'kill $$bridge_pid 2>/dev/null || true' EXIT INT TERM; \
+	gz sim $(GZ_ARGS) $(GZ_WORLD_HOST)
+
+simulator-tacc-gz:
+	@set -e; \
+	source /opt/ros/jazzy/setup.bash; \
+	if [ -f install/setup.bash ]; then source install/setup.bash; fi; \
+	export GZ_SIM_SYSTEM_PLUGIN_PATH="$(CURDIR)/src/ardupilot_gazebo/build:$${GZ_SIM_SYSTEM_PLUGIN_PATH}"; \
+	export GZ_SIM_RESOURCE_PATH="$(CURDIR)/src/bluerov2_gz/models:$(CURDIR)/src/bluerov2_gz/worlds:$(CURDIR)/worlds:$(CURDIR)/src/common_resources/data/object_files:$(CURDIR)/src/sauvc_sim/models:$(CURDIR)/src/sauvc_sim/worlds:$(CURDIR)/src/ardupilot_gazebo/models:$(CURDIR)/src/ardupilot_gazebo/worlds:$${GZ_SIM_RESOURCE_PATH}"; \
+	ros2 run ros_gz_bridge parameter_bridge $(GZ_BRIDGE_AUV_ARGS) --ros-args -r __ns:=/auv_bridge & \
+	bridge_pid=$$!; \
+	trap 'kill $$bridge_pid 2>/dev/null || true' EXIT INT TERM; \
+	gz sim $(GZ_ARGS) $(TACC_WORLD_HOST)
+
+simulator-sauvc-gz:
+	@set -e; \
+	source /opt/ros/jazzy/setup.bash; \
+	if [ -f install/setup.bash ]; then source install/setup.bash; fi; \
+	export GZ_SIM_SYSTEM_PLUGIN_PATH="$(CURDIR)/src/ardupilot_gazebo/build:$${GZ_SIM_SYSTEM_PLUGIN_PATH}"; \
+	export GZ_SIM_RESOURCE_PATH="$(CURDIR)/src/bluerov2_gz/models:$(CURDIR)/src/bluerov2_gz/worlds:$(CURDIR)/worlds:$(CURDIR)/src/common_resources/data/object_files:$(CURDIR)/src/sauvc_sim/models:$(CURDIR)/src/sauvc_sim/worlds:$(CURDIR)/src/ardupilot_gazebo/models:$(CURDIR)/src/ardupilot_gazebo/worlds:$${GZ_SIM_RESOURCE_PATH}"; \
+	ros2 run ros_gz_bridge parameter_bridge $(GZ_BRIDGE_AUV_ARGS) --ros-args -r __ns:=/auv_bridge & \
+	bridge_pid=$$!; \
+	trap 'kill $$bridge_pid 2>/dev/null || true' EXIT INT TERM; \
+	gz sim $(GZ_ARGS) $(SAUVC_WORLD_HOST)
+
+
+endif
 
 # Both use `up --no-recreate -d` so the container is persistent:
 # Ctrl-C stops `gz sim` (the exec) without removing the container; the container
